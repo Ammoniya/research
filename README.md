@@ -11,7 +11,7 @@ This project has 3 main phases that run sequentially:
 Extract patterns from known CVEs to create reusable signatures:
 
 ```bash
-python generate_signatures_v2.py
+python generate_signatures.py
 ```
 
 **Output:** `signatures/` - Generated vulnerability signatures from known CVEs
@@ -71,7 +71,7 @@ For detailed documentation, see:
 ## Project Structure
 
 ```
-├── generate_signatures_v2.py          # Phase 1: Signature generation
+├── generate_signatures.py             # Phase 1: Signature generation
 ├── mine_vulnerability_clones.py       # Phase 2: Clone mining
 ├── validate_zero_days.py              # Phase 3: Fuzzing validation
 ├── utils/                             # Utility scripts
@@ -91,7 +91,7 @@ For detailed documentation, see:
 
 ## Complete Research Pipeline
 
-1. **Phase 1**: Generate signatures from known CVEs (`generate_signatures_v2.py`)
+1. **Phase 1**: Generate signatures from known CVEs (`generate_signatures.py`)
 2. **Phase 2**: Mine for vulnerability clones (`mine_vulnerability_clones.py`)
 3. **Phase 3**: Validate with fuzzing (`validate_zero_days.py`)
 
