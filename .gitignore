@@ -22,3 +22,6 @@ ENV/
 # Generated files
 vulnerability_signatures.json
 *.log
+
+# Large database files
+wordfence_db.json
