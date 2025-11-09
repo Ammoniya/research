@@ -1,0 +1,219 @@
+═══════════════════════════════════════════════════════════════════════════════
+                    PATTERN DETECTION FLOW - HOW IT WORKS
+═══════════════════════════════════════════════════════════════════════════════
+
+Step 1: Get Diff Between Vulnerable and Patched Versions
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                                                                             │
+│  VULNERABLE CODE (version 1.2.3)     PATCHED CODE (version 1.2.4)         │
+│  ─────────────────────────────       ───────────────────────────────       │
+│                                                                             │
+│  function delete_user() {             function delete_user() {             │
+│                                    +    if (!wp_verify_nonce(...)) {       │
+│                                    +      die('Security check');           │
+│                                    +    }                                   │
+│    $id = $_POST['user_id'];           $id = $_POST['user_id'];            │
+│    wp_delete_user($id);               wp_delete_user($id);                │
+│  }                                    }                                     │
+│                                                                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+                                      │
+                                      │ diff command
+                                      ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                              DIFF OUTPUT                                    │
+│  ───────────────────────────────────────────────────────────────────────   │
+│  --- vulnerable/admin.php                                                   │
+│  +++ patched/admin.php                                                      │
+│  @@ -10,6 +10,9 @@                                                          │
+│   function delete_user() {                                                  │
+│  +  if (!wp_verify_nonce($_POST['nonce'], 'delete_user')) {                │
+│  +    die('Security check');                                                │
+│  +  }                                                                        │
+│     $id = $_POST['user_id'];                                                │
+│     wp_delete_user($id);                                                    │
+│   }                                                                          │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+═══════════════════════════════════════════════════════════════════════════════
+
+Step 2: Parse Diff into Before/After Blocks
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  BEFORE (lines starting with -)      AFTER (lines starting with +)         │
+│  ───────────────────────────────     ──────────────────────────────         │
+│                                                                             │
+│  function delete_user() {             function delete_user() {             │
+│  $id = $_POST['user_id'];         +   if (!wp_verify_nonce(...)) {         │
+│  wp_delete_user($id);             +     die('Security check');             │
+│  }                                +   }                                     │
+│                                   +   $id = $_POST['user_id'];             │
+│                                   +   wp_delete_user($id);                 │
+│                                   +  }                                      │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+═══════════════════════════════════════════════════════════════════════════════
+
+Step 3: Search for Patterns in AFTER but NOT in BEFORE
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                                                                             │
+│  FOR EACH PATTERN (e.g., 'wp_verify_nonce'):                               │
+│                                                                             │
+│    ┌─────────────────────────────────────┐                                 │
+│    │ Search in AFTER code:               │                                 │
+│    │   ✓ Found: "wp_verify_nonce"        │                                 │
+│    └─────────────────────────────────────┘                                 │
+│                 │                                                           │
+│                 │ AND                                                       │
+│                 ▼                                                           │
+│    ┌─────────────────────────────────────┐                                 │
+│    │ Search in BEFORE code:              │                                 │
+│    │   ✗ Not found                       │                                 │
+│    └─────────────────────────────────────┘                                 │
+│                 │                                                           │
+│                 │ CONCLUSION                                                │
+│                 ▼                                                           │
+│    ┌─────────────────────────────────────┐                                 │
+│    │ Pattern was ADDED in patch!         │                                 │
+│    │ Add to detected_patterns:           │                                 │
+│    │   "AUTH:wp_verify_nonce"            │                                 │
+│    └─────────────────────────────────────┘                                 │
+│                                                                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+═══════════════════════════════════════════════════════════════════════════════
+
+Step 4: Match Patterns to Vulnerability Type (Severity Assessment)
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                                                                             │
+│  INPUT:                                                                     │
+│    vuln_type = "Cross-Site Request Forgery (CSRF)"                         │
+│    detected_patterns = ["AUTH:wp_verify_nonce"]                            │
+│                                                                             │
+│  LOGIC:                                                                     │
+│    if "AUTH:" in patterns AND "CSRF" in vuln_type:                         │
+│      → severity_indicators.append("CRITICAL:MISSING_AUTH")                 │
+│                                                                             │
+│  OUTPUT:                                                                    │
+│    severity_indicators = ["CRITICAL:MISSING_AUTH"]                         │
+│    exploitability_score = 5.0 + 2.0 (critical) = 7.0                       │
+│                                                                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+═══════════════════════════════════════════════════════════════════════════════
+
+                         WHAT ABOUT MULTIPLE PATTERNS?
+═══════════════════════════════════════════════════════════════════════════════
+
+Example: CSRF + XSS Fixed Together
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                                                                             │
+│  BEFORE:                              AFTER:                                │
+│  ───────────────────────────          ────────────────────────────          │
+│  function show_message() {             function show_message() {            │
+│    $msg = $_POST['msg'];            +    if (!wp_verify_nonce(...)) {      │
+│    echo "<div>$msg</div>";          +      die('Security check');          │
+│  }                                  +    }                                  │
+│                                     +    $msg = sanitize_text_field(...);  │
+│                                     +    echo "<div>".esc_html($msg)."</div>";
+│                                     +  }                                    │
+│                                                                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+                                      │
+                                      ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  DETECTED PATTERNS:                                                         │
+│    1. AUTH:wp_verify_nonce          ← Not in BEFORE, found in AFTER        │
+│    2. SANITIZE:sanitize_text_field  ← Not in BEFORE, found in AFTER        │
+│    3. OUTPUT_ESC:esc_html           ← Not in BEFORE, found in AFTER        │
+└─────────────────────────────────────────────────────────────────────────────┘
+                                      │
+                                      ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  SCENARIO A: CVE says "CSRF"                                                │
+│  ───────────────────────────────────────────────────────────────────────   │
+│  vuln_type = "Cross-Site Request Forgery (CSRF)"                            │
+│  detected_patterns = [                                                      │
+│    "AUTH:wp_verify_nonce",         ← PRIMARY (matches CSRF)                │
+│    "SANITIZE:sanitize_text_field", ← INCIDENTAL (doesn't match CSRF)       │
+│    "OUTPUT_ESC:esc_html"           ← INCIDENTAL (doesn't match CSRF)       │
+│  ]                                                                          │
+│  severity_indicators = [                                                    │
+│    "CRITICAL:MISSING_AUTH"  ← Only CSRF-related!                            │
+│  ]                                                                          │
+│  Note: XSS patterns detected but not in severity_indicators!                │
+└─────────────────────────────────────────────────────────────────────────────┘
+                                      │
+                                      ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  SCENARIO B: CVE says "XSS"                                                 │
+│  ───────────────────────────────────────────────────────────────────────   │
+│  vuln_type = "Cross-Site Scripting (XSS)"                                   │
+│  detected_patterns = [                                                      │
+│    "AUTH:wp_verify_nonce",         ← INCIDENTAL (doesn't match XSS)        │
+│    "SANITIZE:sanitize_text_field", ← PRIMARY (matches XSS)                 │
+│    "OUTPUT_ESC:esc_html"           ← PRIMARY (matches XSS)                 │
+│  ]                                                                          │
+│  severity_indicators = [                                                    │
+│    "HIGH:MISSING_SANITIZATION",     ← XSS-related                           │
+│    "HIGH:MISSING_OUTPUT_ESCAPING"   ← XSS-related                           │
+│  ]                                                                          │
+│  Note: AUTH pattern detected but not in severity_indicators!                │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+═══════════════════════════════════════════════════════════════════════════════
+
+                            POTENTIAL FALSE POSITIVES
+═══════════════════════════════════════════════════════════════════════════════
+
+Case 1: Pattern in Comment
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  BEFORE:                              AFTER:                                │
+│  function vulnerable() {               function vulnerable() {              │
+│    wp_delete_user($_GET['id']);   +    // TODO: Add wp_verify_nonce       │
+│  }                                +    wp_delete_user($_GET['id']);        │
+│                                   +  }                                      │
+│                                                                             │
+│  ✗ RESULT: "AUTH:wp_verify_nonce" detected (FALSE POSITIVE!)               │
+│  ✗ REASON: Pattern found in comment, not actual code                       │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+Case 2: Pattern in Unrelated Function
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  BEFORE:                              AFTER:                                │
+│  function vulnerable() {               function vulnerable() {              │
+│    exec($_GET['cmd']);                 exec($_GET['cmd']);  ← Still vuln!  │
+│  }                                     }                                    │
+│                                   +                                         │
+│                                   +  // New unrelated function             │
+│                                   +  function helper() {                   │
+│                                   +    if (wp_verify_nonce(...)) {         │
+│                                   +      // ...                            │
+│                                   +    }                                   │
+│                                   +  }                                     │
+│                                                                             │
+│  ✗ RESULT: "AUTH:wp_verify_nonce" detected (FALSE POSITIVE!)               │
+│  ✗ REASON: Pattern in new function, vulnerability not actually fixed       │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+═══════════════════════════════════════════════════════════════════════════════
+
+                              KEY TAKEAWAYS
+═══════════════════════════════════════════════════════════════════════════════
+
+✓ WORKS WELL:
+  • Simple, single-pattern fixes (70-80% of cases)
+  • Clear pattern matching (CSRF → AUTH, SQL Injection → SQL_SECURITY)
+  • Small diffs with one function changed
+
+⚠ LIMITATIONS:
+  • Can't distinguish PRIMARY vs INCIDENTAL fixes perfectly
+  • No context awareness (comments, unrelated code)
+  • Multiple patterns may confuse classification
+
+✓ HOW TO USE SAFELY:
+  • Focus on patterns matching vuln_type
+  • Review diff_before/diff_after for confirmation
+  • Use exploitability_score for prioritization
+  • Treat multi-pattern signatures with caution
+
+═══════════════════════════════════════════════════════════════════════════════
