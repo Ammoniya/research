@@ -1,11 +1,17 @@
 import json
 import os
 from collections import defaultdict
+from pathlib import Path
+import sys
+
+# Import centralized data paths
+sys.path.insert(0, str(Path(__file__).parent.parent))
+from data_paths import INPUT_PLUGIN_LIST, INPUT_WORDFENCE_DB, INPUT_PLUGIN_VULNERABILITIES
 
 # --- Configuration ---
-SLUG_INPUT_FILE = 'top_10k_plugin_slugs.txt'
-DB_INPUT_FILE = 'wordfence_db.json'
-VULN_OUTPUT_FILE = 'plugin_vulnerabilities.json'
+SLUG_INPUT_FILE = str(INPUT_PLUGIN_LIST)
+DB_INPUT_FILE = str(INPUT_WORDFENCE_DB)
+VULN_OUTPUT_FILE = str(INPUT_PLUGIN_VULNERABILITIES)
 
 def process_vulnerabilities():
     """

@@ -1,11 +1,17 @@
 import requests
 import json
 import os
+from pathlib import Path
+import sys
+
+# Import centralized data paths
+sys.path.insert(0, str(Path(__file__).parent.parent))
+from data_paths import INPUT_WORDFENCE_DB
 
 # --- Configuration ---
 # This is the public, key-less API endpoint for the Wordfence Production feed
 API_URL = "https://www.wordfence.com/api/intelligence/v2/vulnerabilities/production"
-OUTPUT_FILE = "wordfence_db.json"
+OUTPUT_FILE = str(INPUT_WORDFENCE_DB)
 REQUEST_TIMEOUT = 30  # This can be a large download
 
 def download_database():

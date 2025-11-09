@@ -23,5 +23,21 @@ ENV/
 vulnerability_signatures.json
 *.log
 
-# Large database files
+# Data directory - all input/output data
+data/input/*.json
+data/input/*.txt
+data/output/**/*
+
+# Keep directory structure but ignore contents
+!data/input/.gitkeep
+!data/output/.gitkeep
+
+# Legacy paths (deprecated - now using data/ directory)
 wordfence_db.json
+plugin_vulnerabilities.json
+top_10k_plugin_slugs.txt
+signatures/
+mining_results/
+fuzz_results/
+reports/
+fuzz_targets/

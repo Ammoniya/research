@@ -40,6 +40,9 @@ from typing import List, Optional
 # Add parent directory to path
 sys.path.insert(0, str(Path(__file__).parent))
 
+# Import centralized data paths
+from data_paths import MINING_ZERO_DAYS_DIR, OUTPUT_FUZZ_DIR
+
 from vulnerability_miner.models import ZeroDayFinding
 from vulnerability_miner.zero_day_detector import ZeroDayDetector
 
@@ -372,13 +375,13 @@ def main():
 
     parser.add_argument(
         '--input-dir',
-        default='mining_results/zero_days',
+        default=str(MINING_ZERO_DAYS_DIR),
         help='Input directory with Phase 2 zero-day findings'
     )
 
     parser.add_argument(
         '--output-dir',
-        default='fuzz_results',
+        default=str(OUTPUT_FUZZ_DIR),
         help='Output directory for fuzzing results'
     )
 
