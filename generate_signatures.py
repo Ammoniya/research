@@ -232,10 +232,6 @@ def main():
     print(f"\n[*] Saving final progress...")
     progress_mgr.save(progress_mgr.processed_ids, stats)
 
-    # Generate consolidated file
-    print(f"\n[*] Generating consolidated signatures file...")
-    generator.save_consolidated_signatures(config.signatures_consolidated_file)
-
     # Generate statistics
     gen_stats = generator.generate_statistics()
 
@@ -273,7 +269,6 @@ def main():
         print(f"  {vuln_type}: {count}")
 
     print(f"\n[+] Signatures saved to: {config.signatures_output_dir}/")
-    print(f"[+] Consolidated file: {config.signatures_consolidated_file}")
     print(f"[+] Progress file: {config.progress_file}")
 
 
