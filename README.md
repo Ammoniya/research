@@ -2,70 +2,85 @@
 
 Automated discovery and validation of zero-day vulnerabilities in WordPress plugins through historical vulnerability pattern mining and fuzzing-based validation.
 
-## Quick Start: Running Phase 3
+## Quick Start: Running the 3 Phases
 
-Phase 3 validates zero-day candidates from Phase 2 using automated fuzzing to prune false positives and generate proof-of-concept exploits.
+This project has 3 main phases that run sequentially:
 
-### Basic Usage
+### Phase 1: Generate Vulnerability Signatures
 
-Validate all Phase 2 zero-day candidates:
+Extract patterns from known CVEs to create reusable signatures:
+
+```bash
+python generate_signatures_v2.py
+```
+
+**Output:** `signatures/` - Generated vulnerability signatures from known CVEs
+
+### Phase 2: Mine Vulnerability Clones
+
+Search for zero-day candidates by matching signatures against plugin codebases:
+
+```bash
+python mine_vulnerability_clones.py
+```
+
+**Options:**
+```bash
+# Mine specific plugins
+python mine_vulnerability_clones.py --plugin vulnerable-plugin
+
+# Limit scope
+python mine_vulnerability_clones.py --max-plugins 100
+```
+
+**Output:** `mining_results/zero_days/` - Detected zero-day candidates
+
+### Phase 3: Validate with Fuzzing
+
+Validate zero-day candidates using automated fuzzing to prune false positives:
 
 ```bash
 python validate_zero_days.py
 ```
 
-### Custom Configuration
-
+**Options:**
 ```bash
-# Fuzz with custom timeout (2 hours per target)
+# Custom timeout (2 hours per target)
 python validate_zero_days.py --timeout 7200
 
-# Limit fuzzing scope
-python validate_zero_days.py --max-candidates 50
-
-# Use parallel fuzzing (8 concurrent jobs)
+# Parallel fuzzing (8 concurrent jobs)
 python validate_zero_days.py --parallel 8
 
 # Validate specific plugin
 python validate_zero_days.py --plugin vulnerable-plugin
-
-# Validate specific vulnerability type
-python validate_zero_days.py --vuln-type CSRF
 ```
 
-### What Phase 3 Does
-
-1. Loads zero-day candidates from Phase 2
-2. Generates fuzzing harnesses for each vulnerability type
-3. Runs automated fuzzing campaigns
-4. Collects crashing inputs as proof of exploitability
-5. Prunes false positives (no crash = not vulnerable)
-6. Generates validated zero-days with PoC exploits
-
-### Output
-
-Results are saved in:
+**Output:**
 - `fuzz_results/validated/` - Validated vulnerabilities with crash evidence
 - `fuzz_results/crashes/` - Crashing inputs
 - `fuzz_results/exploits/` - Generated PoC exploits
-- `fuzz_results/false_positives/` - Pruned candidates
 
 ## Documentation
 
 For detailed documentation, see:
-- `docs/PHASE3_FUZZING.md` - Complete Phase 3 documentation
+- `docs/PHASE2_MINING.md` - Phase 2 mining documentation
+- `docs/PHASE3_FUZZING.md` - Phase 3 fuzzing documentation
 - `docs/QUICKSTART.md` - Full project quickstart guide
 - `docs/PROJECT_STRUCTURE.md` - Project architecture
 
 ## Project Structure
 
 ```
-├── validate_zero_days.py              # Phase 3 CLI entry point
+├── generate_signatures_v2.py          # Phase 1: Signature generation
+├── mine_vulnerability_clones.py       # Phase 2: Clone mining
+├── validate_zero_days.py              # Phase 3: Fuzzing validation
+├── utils/                             # Utility scripts
 ├── fuzzing_validator/                 # Fuzzing validation system
-├── vulnerability_miner/               # Phase 2 mining system
-├── wordpress_vulnerability_analyzer/  # Phase 1 analysis
-├── fuzz_targets/                      # Generated fuzzing targets
-└── fuzz_results/                      # Fuzzing results
+├── vulnerability_miner/               # Mining system
+├── wordpress_vulnerability_analyzer/  # Analysis system
+├── signatures/                        # Generated signatures (Phase 1 output)
+├── mining_results/                    # Mining results (Phase 2 output)
+└── fuzz_results/                      # Fuzzing results (Phase 3 output)
 ```
 
 ## Requirements
@@ -74,11 +89,11 @@ For detailed documentation, see:
 - WordPress test environment (optional, for live fuzzing)
 - Dependencies: `pip install -r requirements.txt`
 
-## Research Pipeline
+## Complete Research Pipeline
 
-1. **Phase 1**: Signature generation from known CVEs
-2. **Phase 2**: Historical vulnerability clone mining
-3. **Phase 3**: Fuzzing-based validation (you are here)
+1. **Phase 1**: Generate signatures from known CVEs (`generate_signatures_v2.py`)
+2. **Phase 2**: Mine for vulnerability clones (`mine_vulnerability_clones.py`)
+3. **Phase 3**: Validate with fuzzing (`validate_zero_days.py`)
 
 ---
 
