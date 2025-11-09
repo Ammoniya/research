@@ -1,0 +1,39 @@
+{
+  "cve": "CVE-2019-13635",
+  "plugin_slug": "wp-fastest-cache",
+  "vuln_type": "Improper Limitation of a Pathname to a Restricted Directory ('Path Traversal')",
+  "signature_type": "security_function_pattern",
+  "pattern": "Improper Limitation of a Pathname to a Restricted Directory ('Path Traversal')::TYPE_CAST[array]",
+  "context": {
+    "title": "WP Fastest Cache <= 0.8.9.5 - Directory Traversal",
+    "affected_versions": "<= 0.8.9.5",
+    "patched_version": null,
+    "wordfence_uuid": "07fc1249-a50d-4038-8cbe-35ff7a3d28b3",
+    "detected_patterns": [
+      "TYPE_CAST:array"
+    ],
+    "file_changes": 5,
+    "quality_score": 0.9
+  },
+  "primary_patterns": [],
+  "incidental_patterns": [
+    "TYPE_CAST:array"
+  ],
+  "severity_indicators": [],
+  "exploitability_score": 5.0,
+  "diff_before": "File: /home/ravindu/compweb/svn_wordpress_org/wp-fastest-cache/tags/0.8.9.5/inc/admin.php\n\t\t\t\t$data = $data.\"RewriteCond %{DOCUMENT_ROOT}/\".WPFC_WP_CONTENT_BASENAME.\"/cache/all/$1/index.html -f\".\"\\n\";\n\t\t\t\t$data = $data.\"RewriteCond %{DOCUMENT_ROOT}/\".WPFC_WP_CONTENT_BASENAME.\"/cache/all/$1/index.html -f [or]\".\"\\n\";\n\t\t\t\t$data = $data.\"RewriteCond \".$tmp_WPFC_WP_CONTENT_DIR.\"/cache/all/\".$this->getRewriteBase(true).\"$1/index.html -f\".\"\\n\";\n\t\t\t$data = $data.'RewriteRule ^(.*) \"/'.$this->getRewriteBase().WPFC_WP_CONTENT_BASENAME.'/cache/all/'.$this->getRewriteBase(true).'$1/index.html\" [\n\nFile: /home/ravindu/compweb/svn_wordpress_org/wp-fastest-cache/tags/0.8.9.5/inc/cache.php\n\t\t\t//WPML language switch\n\t\t\t//https://wpml.org/forums/topic/wpml-language-switch-wp-fastest-cache-issue/\n\t\t\t$language_negotiation_type = apply_filters('wpml_setting', false, 'language_negotiation_type');\n\t\t\tif ($this->isPluginActive('sitepress-multilingual-cms/sitepress.php') && 2 == $language_negotiation_type){\n\t\t\t    $current_language = apply_filters('wpml_current_language', false);\n\t\t\t    \n\t\t\t    $this->cacheFilePath = str_replace('/cache/all/', '/cache/all/'.$current_language.'/', $this->ca\n\nFile: /home/ravindu/compweb/svn_wordpress_org/wp-fastest-cache/tags/0.8.9.5/js/cdn/cdn.js\n\t\t\t\tself.show_button(\"back\");",
+  "diff_after": "File: /home/ravindu/compweb/svn_wordpress_org/wp-fastest-cache/tags/0.8.9.5/inc/admin.php\n\t\t\t$language_negotiation_type = apply_filters('wpml_setting', false, 'language_negotiation_type');\n\t\t\tif(($language_negotiation_type == 2) && $this->isPluginActive('sitepress-multilingual-cms/sitepress.php')){\n\t\t\t\t$cache_path = '/cache/all/%{HTTP_HOST}/';\n\t\t\t\t$disable_condition = true;\n\t\t\t}else{\n\t\t\t\t$cache_path = '/cache/all/';\n\t\t\t\t$disable_condition = false;\n\t\t\t}\n\n\t\t\t\t$data = $data.\"RewriteCond %{DOCUMENT_ROOT}/\".WPFC_WP_CONTENT_BASENAME.$cache_path.\"$1/index.html -f\".\"\\n\";\n\t\t\t\t$data = $data.\"R\n\nFile: /home/ravindu/compweb/svn_wordpress_org/wp-fastest-cache/tags/0.8.9.5/inc/cache.php\n\n\t\t\t// for security\n\t\t\tif(preg_match(\"/\\.{2,}/\", $this->cacheFilePath)){\n\t\t\t\t$this->cacheFilePath = false;\n\t\t\t}\n\t\t\t\t\t}else if(isset($value->prefix) && $value->prefix && ($value->type == \"page\")){\n\t\t\t\t\t\tif($buffer && preg_match(\"/^(homepage|category|tag|post|page|archive|attachment)$/\", $value->prefix)){\n\t\t\t\t\t\t\tif($preg_match_rule){\n\t\t\t\t\t\t\t\tif(preg_match(\"/\".$preg_match_rule.\"/i\", $request_url)){\n\t\t\t\t\t\t\t\t\treturn true;\n\t\t\t\t\t\t\t\t}\n\nFile: /home/ravindu/compweb/svn_wordpress_org/wp-fastest-cache/tags/0.8.9.5/js/cdn/cdn.js\n\t\t\t\tif(current_page.attr(\"wpfc-cdn-page\") == 2){\n\t\t\t\t\tif(self.id == \"maxcdn\"){\n\t\t\t\t\t\tself.show_button(\"back\");\n\t\t\t\t\t}\n\t\t\t\t}else{\n\t\t\t\t\tself.show_button(\"back\");\n\t\t\t\t}",
+  "diff_stats": {
+    "file_changes": 5,
+    "php_files": 3,
+    "total_lines_added": 53,
+    "total_lines_removed": 24
+  },
+  "extracted_at": "2025-11-09T06:57:38.487925",
+  "validated": true,
+  "validation_notes": [
+    "[INFO] Single pattern signature (high confidence)",
+    "[WARNING] No primary patterns match vulnerability type - may be misclassified",
+    "[INFO] More incidental than primary patterns - multiple issues fixed together"
+  ]
+}
