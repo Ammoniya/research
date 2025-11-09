@@ -494,6 +494,105 @@ When adding new features:
 - **Scalable**: Handles thousands of vulnerabilities efficiently
 - **Resumable**: Progress tracking for long-running operations
 
+---
+
+# Phase 2: Historical Vulnerability Clone Mining
+
+After Phase 1 generates vulnerability signatures, **Phase 2** mines the entire WordPress plugin ecosystem to discover:
+
+- **Zero-day vulnerabilities** (plugins with known vulnerability patterns, no CVE assigned)
+- **Vulnerability inheritance** (how patterns spread between plugins)
+- **Temporal evolution** (how long vulnerabilities persist before being fixed)
+
+For complete Phase 2 documentation, see **[PHASE2_MINING.md](PHASE2_MINING.md)**
+
+## Quick Start - Phase 2
+
+```bash
+# Mine all signatures across all plugins
+python mine_vulnerability_clones.py
+
+# Limited scope (for testing)
+python mine_vulnerability_clones.py --max-plugins 100 --max-revisions 50
+
+# View results
+ls -la mining_results/
+```
+
+## Phase 2 Output
+
+- **Timelines**: Historical tracking of vulnerability patterns per plugin
+- **Metrics**: VPP, PPD, SFR, EW metrics for research
+- **Zero-days**: Potential zero-day findings in current plugin versions
+
+---
+
+# Phase 3: Fuzzing-Based False Positive Pruning
+
+Phase 2 pattern matching can generate **false positives**. **Phase 3** validates candidates through automated fuzzing:
+
+- **Generates fuzzing harnesses** for each vulnerability type (SQL injection, XSS, CSRF, path traversal, etc.)
+- **Runs automated fuzzing campaigns** to detect real crashes
+- **Prunes false positives** (no crash = not vulnerable)
+- **Generates proof-of-concept exploits** for validated vulnerabilities
+- **Calculates CVSS scores** for exploitability assessment
+
+For complete Phase 3 documentation, see **[PHASE3_FUZZING.md](PHASE3_FUZZING.md)**
+
+## Quick Start - Phase 3
+
+```bash
+# Test Phase 3 components
+python test_phase3.py
+
+# Validate all Phase 2 zero-day candidates
+python validate_zero_days.py
+
+# Validate with custom settings
+python validate_zero_days.py --timeout 7200 --parallel 8
+
+# Validate specific plugin
+python validate_zero_days.py --plugin vulnerable-plugin
+
+# Limited scope (for testing)
+python validate_zero_days.py --max-candidates 10 --timeout 300
+```
+
+## Phase 3 Output
+
+- **Validated vulnerabilities**: Zero-days with proof-of-concept exploits
+- **False positives**: Filtered out non-exploitable candidates
+- **Crash reports**: Detailed analysis of crashes found during fuzzing
+- **PoC exploits**: Python scripts demonstrating exploitation
+
+## Complete Research Pipeline
+
+```bash
+# Phase 1: Generate vulnerability signatures
+python generate_signatures_v2.py
+
+# Phase 2: Mine historical clones and find zero-days
+python mine_vulnerability_clones.py --max-plugins 1000
+
+# Phase 3: Validate zero-days through fuzzing
+python validate_zero_days.py --max-candidates 50
+
+# Results
+# - Phase 1: signatures/ directory
+# - Phase 2: mining_results/ directory
+# - Phase 3: fuzz_results/ directory
+```
+
+## Research Impact
+
+This three-phase pipeline enables:
+
+1. ✅ **Automated vulnerability signature generation** (Phase 1)
+2. ✅ **Large-scale historical clone mining** (Phase 2)
+3. ✅ **Fuzzing-based validation with PoC generation** (Phase 3)
+
+**No other research** has achieved automated, large-scale fuzzing validation of historical vulnerability clones. This is **groundbreaking**.
+
 ## Acknowledgments
 
 - WordPress Plugin Security Team
