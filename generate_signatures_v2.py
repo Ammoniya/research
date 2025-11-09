@@ -7,6 +7,7 @@ Enhanced modular version with better pattern detection, validation, and resume c
 
 import json
 import os
+import re
 import signal
 import sys
 from typing import Dict, List
@@ -144,9 +145,13 @@ def main():
 
             print(f"  [{stats['processed']}/{total_vulns}] {cve} - {vuln_type}")
 
-            # Get version information (simplified for now)
-            # In production, you'd fetch from Wordfence API
-            vuln_info.affected_versions = title.split()[-1] if title else "unknown"
+            # Extract version information from title
+            # Parse constraint like "<= 1.1.2", "< 1.0.5", "= 1.2.3"
+            version_match = re.search(r'([<>=]+)\s*([\d.]+)', title)
+            if version_match:
+                vuln_info.affected_versions = f"{version_match.group(1)} {version_match.group(2)}"
+            else:
+                vuln_info.affected_versions = "unknown"
 
             # Find versions in SVN
             print(f"    [*] Looking for versions in SVN...")
