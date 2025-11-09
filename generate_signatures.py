@@ -197,9 +197,42 @@ class SVNDiffExtractor:
             print(f"Error diffing {plugin_slug}: {e}")
             return None
 
+    def check_remote_tag_exists(self, plugin_slug: str, tag_version: str) -> bool:
+        """Check if a tag exists in the remote SVN repository"""
+        try:
+            tag_url = f"https://plugins.svn.wordpress.org/{plugin_slug}/tags/{tag_version}/"
+            result = subprocess.run(
+                ['svn', 'info', tag_url],
+                capture_output=True,
+                text=True,
+                timeout=30
+            )
+            if result.returncode == 0:
+                return True
+            else:
+                print(f"    [!] Tag does not exist: {tag_url}")
+                if result.stderr:
+                    print(f"    [!] SVN error: {result.stderr.strip()}")
+                return False
+        except subprocess.TimeoutExpired:
+            print(f"    [!] Timeout checking tag existence: {tag_url}")
+            return False
+        except Exception as e:
+            print(f"    [!] Error checking tag: {e}")
+            return False
+
     def get_diff_from_remote(self, plugin_slug: str, vuln_version: str, fixed_version: str) -> Optional[str]:
         """Fetch and diff versions from remote SVN repository"""
         try:
+            # First check if both tags exist
+            print(f"    [*] Verifying tags exist in remote repository...")
+            if not self.check_remote_tag_exists(plugin_slug, vuln_version):
+                print(f"    [!] Vulnerable version tag '{vuln_version}' not found in remote SVN")
+                return None
+            if not self.check_remote_tag_exists(plugin_slug, fixed_version):
+                print(f"    [!] Fixed version tag '{fixed_version}' not found in remote SVN")
+                return None
+
             with tempfile.TemporaryDirectory() as tmpdir:
                 tmpdir = Path(tmpdir)
 
@@ -209,26 +242,35 @@ class SVNDiffExtractor:
                 vuln_dir = tmpdir / "vulnerable"
                 fixed_dir = tmpdir / "fixed"
 
+                print(f"    [*] Checking out vulnerable version: {vuln_version}")
                 # Checkout vulnerable version
                 result = subprocess.run(
                     ['svn', 'checkout', '--depth', 'infinity', vuln_url, str(vuln_dir)],
                     capture_output=True,
+                    text=True,
                     timeout=120
                 )
                 if result.returncode != 0:
-                    print(f"Failed to checkout vulnerable version {vuln_url}")
+                    print(f"    [!] Failed to checkout vulnerable version {vuln_url}")
+                    print(f"    [!] SVN stdout: {result.stdout.strip()}")
+                    print(f"    [!] SVN stderr: {result.stderr.strip()}")
                     return None
 
+                print(f"    [*] Checking out fixed version: {fixed_version}")
                 # Checkout fixed version
                 result = subprocess.run(
                     ['svn', 'checkout', '--depth', 'infinity', fixed_url, str(fixed_dir)],
                     capture_output=True,
+                    text=True,
                     timeout=120
                 )
                 if result.returncode != 0:
-                    print(f"Failed to checkout fixed version {fixed_url}")
+                    print(f"    [!] Failed to checkout fixed version {fixed_url}")
+                    print(f"    [!] SVN stdout: {result.stdout.strip()}")
+                    print(f"    [!] SVN stderr: {result.stderr.strip()}")
                     return None
 
+                print(f"    [*] Generating diff...")
                 # Generate diff
                 result = subprocess.run(
                     ['diff', '-ruN', str(vuln_dir), str(fixed_dir)],
@@ -240,10 +282,10 @@ class SVNDiffExtractor:
                 return result.stdout if result.stdout else None
 
         except subprocess.TimeoutExpired:
-            print(f"Timeout fetching remote diff for {plugin_slug}")
+            print(f"    [!] Timeout fetching remote diff for {plugin_slug}")
             return None
         except Exception as e:
-            print(f"Error fetching remote diff for {plugin_slug}: {e}")
+            print(f"    [!] Error fetching remote diff for {plugin_slug}: {e}")
             return None
 
 class SignatureExtractor:
@@ -590,26 +632,35 @@ def main():
             )
 
             # Find vulnerable and patched versions in SVN
+            print(f"    [*] Looking for versions in SVN (affected: {affected_versions}, patched: {patched_version})")
             vuln_version, fixed_version = svn_extractor.find_vulnerable_and_patched_versions(
                 plugin_slug, affected_versions, patched_version
             )
 
             if not vuln_version or not fixed_version:
-                print(f"    [!] Could not find versions in SVN (vuln={vuln_version}, fixed={fixed_version})")
+                print(f"    [!] Could not find suitable versions in SVN")
+                print(f"        Vulnerable version found: {vuln_version if vuln_version else 'None'}")
+                print(f"        Fixed version found: {fixed_version if fixed_version else 'None'}")
+                available_tags = svn_extractor.get_available_tags(plugin_slug)
+                if available_tags:
+                    print(f"        Available tags: {', '.join(available_tags[:10])}{' ...' if len(available_tags) > 10 else ''}")
+                else:
+                    print(f"        No tags found in local SVN repository")
                 continue
 
             print(f"    [->] Comparing versions: {vuln_version} -> {fixed_version}")
 
             # Try to get diff from local repo first
+            print(f"    [*] Attempting to get diff from local repository...")
             diff = svn_extractor.get_diff_from_local(plugin_slug, vuln_version, fixed_version)
 
             # Fallback to remote if local fails
             if not diff:
-                print(f"    � Fetching from remote SVN...")
+                print(f"    [*] Local diff failed, fetching from remote SVN...")
                 diff = svn_extractor.get_diff_from_remote(plugin_slug, vuln_version, fixed_version)
 
             if not diff:
-                print(f"     Failed to extract diff")
+                print(f"    [X] Failed to extract diff from both local and remote sources")
                 continue
 
             # Extract signature from diff
@@ -618,10 +669,10 @@ def main():
             if signature:
                 signatures.append(asdict(signature))
                 success_count += 1
-                print(f"     Signature extracted: {signature.pattern}")
-                print(f"     Exploitability score: {signature.exploitability_score:.1f}/10")
+                print(f"    [+] Signature extracted: {signature.pattern}")
+                print(f"    [+] Exploitability score: {signature.exploitability_score:.1f}/10")
             else:
-                print(f"    � No signature pattern detected")
+                print(f"    [-] No signature pattern detected")
 
     # Save signatures
     print(f"\n\n=== Generation Complete ===")
@@ -641,7 +692,7 @@ def main():
             'signatures': signatures
         }, f, indent=2)
 
-    print(f" Signatures saved successfully!")
+    print(f"[+] Signatures saved successfully!")
 
     # Generate statistics
     print("\n=== Signature Statistics ===")
