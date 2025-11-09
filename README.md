@@ -26,12 +26,26 @@ python mine_vulnerability_clones.py
 
 **Options:**
 ```bash
-# Mine specific plugins
-python mine_vulnerability_clones.py --plugin vulnerable-plugin
+# Fast mode - scan only tagged releases (recommended for quick results)
+python mine_vulnerability_clones.py --scan-mode releases --max-plugins 100
 
-# Limit scope
-python mine_vulnerability_clones.py --max-plugins 100
+# Comprehensive mode - scan all commits (slower but thorough)
+python mine_vulnerability_clones.py --scan-mode commits --max-plugins 100
+
+# Limit number of revisions per plugin
+python mine_vulnerability_clones.py --max-revisions 50
 ```
+
+**Scan Modes:**
+- **`releases`** (fast): Scans only tagged releases (e.g., 1.0.0, 1.1.0, 2.0.0)
+  - Much faster (typically 10-50 versions vs 1000+ commits)
+  - Focuses on official published versions
+  - Recommended for initial research
+
+- **`commits`** (comprehensive): Scans all SVN commits
+  - Very slow but thorough (scans every code change)
+  - Better temporal analysis of when vulnerabilities appeared
+  - Use when you need complete historical analysis
 
 **Output:** `mining_results/zero_days/` - Detected zero-day candidates
 
