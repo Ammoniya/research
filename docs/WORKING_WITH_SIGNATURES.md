@@ -463,12 +463,77 @@ def detect_csrf_vulnerability(php_code):
 
 ---
 
-## Next Steps
+## Production Usage Recommendations
 
-1. **Generate signatures** with current tool
-2. **Review top 10** critical signatures manually
-3. **Build detection rules** for common patterns
-4. **Consider integrating** enhanced detection (see `enhanced_pattern_detection.py`)
-5. **Validate findings** against actual CVE details
+### For Security Scanners
 
-The signatures are a powerful starting point for understanding vulnerability patterns, but should be combined with manual review for critical applications.
+1. **Filter by Quality Score**: Use signatures with quality_score >= 0.8 for high confidence
+2. **Focus on Primary Patterns**: Use patterns that match the vulnerability type
+3. **Validate Detections**: Cross-reference with CVE details and patch diffs
+4. **Update Regularly**: Regenerate signatures as new vulnerabilities are discovered
+
+### For Vulnerability Research
+
+1. **Analyze Pattern Distributions**: Understand common fix patterns across vulnerability types
+2. **Study High-Impact Fixes**: Focus on signatures with exploitability_score >= 8.0
+3. **Compare Across Plugins**: Identify systemic issues vs. plugin-specific problems
+4. **Track Evolution**: Monitor how fix patterns change over time
+
+### For Automated Analysis
+
+```python
+# Example: Load and filter high-quality signatures
+import json
+
+def load_trusted_signatures(min_quality=0.8, min_exploitability=7.0):
+    """Load only high-quality, high-impact signatures"""
+    with open('vulnerability_signatures.json') as f:
+        data = json.load(f)
+
+    return [
+        sig for sig in data['signatures']
+        if sig.get('context', {}).get('quality_score', 0) >= min_quality
+        and sig.get('exploitability_score', 0) >= min_exploitability
+        and sig.get('validated', False)
+    ]
+
+# Use in your security scanner
+trusted_sigs = load_trusted_signatures()
+print(f"Loaded {len(trusted_sigs)} trusted signatures")
+```
+
+## Advanced Analysis
+
+### Signature Clustering
+
+Group signatures by pattern similarity to find common vulnerability classes:
+
+```bash
+# Find all CSRF signatures and their patterns
+jq -r '.signatures[] |
+    select(.vuln_type | contains("CSRF")) |
+    .context.detected_patterns[] ' vulnerability_signatures.json |
+    sort | uniq -c | sort -rn
+```
+
+### Cross-Plugin Analysis
+
+Identify vulnerabilities that appear across multiple plugins:
+
+```bash
+# Find common patterns across plugins
+jq -r '.signatures[] |
+    "\(.pattern) | \(.plugin_slug)"' vulnerability_signatures.json |
+    cut -d'|' -f1 | sort | uniq -c | sort -rn | head -20
+```
+
+## Summary
+
+The generated signatures provide valuable insights into WordPress vulnerability patterns. When used with proper validation and filtering, they can:
+
+- **Accelerate security scanning** by identifying high-probability vulnerability patterns
+- **Guide security research** by revealing common weaknesses in WordPress plugins
+- **Inform secure development** by highlighting security functions that prevent vulnerabilities
+- **Enable proactive defense** by detecting similar issues before they're exploited
+
+Always combine automated signature analysis with manual review and validation for production security applications.
