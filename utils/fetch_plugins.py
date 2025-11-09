@@ -1,12 +1,18 @@
 import requests
 import json
 import time
+from pathlib import Path
+import sys
+
+# Import centralized data paths
+sys.path.insert(0, str(Path(__file__).parent.parent))
+from data_paths import INPUT_PLUGIN_LIST
 
 # --- Configuration ---
 API_URL = "https://api.wordpress.org/plugins/info/1.1/"
 TOTAL_PAGES = 100  # 100 pages * 100 per_page = 10,000 plugins
 PER_PAGE = 100
-OUTPUT_FILE = 'top_10k_plugin_slugs.txt'
+OUTPUT_FILE = str(INPUT_PLUGIN_LIST)
 
 # --- Script ---
 all_plugin_slugs = []

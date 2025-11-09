@@ -3,6 +3,20 @@
 import os
 from dataclasses import dataclass, field
 from typing import List, Dict
+from pathlib import Path
+
+# Import centralized data paths
+import sys
+sys.path.insert(0, str(Path(__file__).parent.parent))
+from data_paths import (
+    OUTPUT_FUZZ_DIR,
+    FUZZ_CRASHES_DIR,
+    FUZZ_VALIDATED_DIR,
+    FUZZ_FALSE_POSITIVES_DIR,
+    FUZZ_EXPLOITS_DIR,
+    MINING_ZERO_DAYS_DIR,
+    ensure_data_directories
+)
 
 
 @dataclass
@@ -13,15 +27,15 @@ class FuzzingConfig:
     wordpress_path: str = "/var/www/html"
     plugins_path: str = "/var/www/html/wp-content/plugins"
     fuzz_targets_dir: str = "fuzz_targets"
-    fuzz_results_dir: str = "fuzz_results"
-    zero_days_input_dir: str = "mining_results/zero_days"
+    fuzz_results_dir: str = str(OUTPUT_FUZZ_DIR)
+    zero_days_input_dir: str = str(MINING_ZERO_DAYS_DIR)
 
     # Output directories
-    campaigns_dir: str = "fuzz_results/campaigns"
-    crashes_dir: str = "fuzz_results/crashes"
-    validated_dir: str = "fuzz_results/validated"
-    false_positives_dir: str = "fuzz_results/false_positives"
-    exploits_dir: str = "fuzz_results/exploits"
+    campaigns_dir: str = str(OUTPUT_FUZZ_DIR / "campaigns")
+    crashes_dir: str = str(FUZZ_CRASHES_DIR)
+    validated_dir: str = str(FUZZ_VALIDATED_DIR)
+    false_positives_dir: str = str(FUZZ_FALSE_POSITIVES_DIR)
+    exploits_dir: str = str(FUZZ_EXPLOITS_DIR)
 
     # Fuzzing parameters
     fuzzer: str = "custom-php-fuzzer"  # custom-php-fuzzer, afl++, libfuzzer
@@ -99,19 +113,13 @@ class FuzzingConfig:
 
     def ensure_directories(self):
         """Create necessary directories."""
-        dirs = [
-            self.fuzz_targets_dir,
-            self.fuzz_results_dir,
-            self.campaigns_dir,
-            self.crashes_dir,
-            self.validated_dir,
-            self.false_positives_dir,
-            self.exploits_dir,
-            self.dictionaries_dir,
-        ]
+        # Use centralized directory creation
+        ensure_data_directories()
 
-        for dir_path in dirs:
-            os.makedirs(dir_path, exist_ok=True)
+        # Create additional directories specific to fuzzing
+        os.makedirs(self.fuzz_targets_dir, exist_ok=True)
+        os.makedirs(self.campaigns_dir, exist_ok=True)
+        os.makedirs(self.dictionaries_dir, exist_ok=True)
 
         # Create subdirectories for fuzz targets by vulnerability type
         vuln_types = ['sqli', 'xss', 'csrf', 'path_traversal', 'auth_bypass', 'file_upload']
