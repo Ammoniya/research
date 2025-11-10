@@ -150,7 +150,7 @@ def parse_markdown_signature(file_path: Path) -> Optional[Dict]:
         return None
 
 
-def load_signatures_from_directory(directory: Path, prefer_format: str = 'json') -> List[Dict]:
+def load_signatures_from_directory(directory: Path, prefer_format: str = 'json', verbose: bool = False) -> List[Dict]:
     """
     Load all CVE signatures from a directory (searches recursively).
 
@@ -159,6 +159,7 @@ def load_signatures_from_directory(directory: Path, prefer_format: str = 'json')
     Args:
         directory: Directory containing signature JSON or Markdown files
         prefer_format: 'json' or 'markdown' - format to prefer when both exist
+        verbose: Whether to print verbose output
 
     Returns:
         List of signature dicts
@@ -166,14 +167,20 @@ def load_signatures_from_directory(directory: Path, prefer_format: str = 'json')
     signatures = []
 
     if not directory.exists():
-        print(f"Error: Directory not found: {directory}")
+        print(f"❌ Error: Directory not found: {directory}")
         return signatures
+
+    if verbose:
+        print(f"\n{'='*60}")
+        print(f"Loading signatures from: {directory}")
+        print(f"{'='*60}")
+        print(f"Searching for signature files...")
 
     # Search recursively for both JSON and Markdown files
     json_files = list(directory.rglob("*.json"))
     md_files = list(directory.rglob("*.md"))
 
-    print(f"Found {len(json_files)} JSON and {len(md_files)} Markdown signature files in {directory}")
+    print(f"✓ Found {len(json_files)} JSON and {len(md_files)} Markdown signature files")
 
     # Build a map of signature stem -> files to deduplicate
     from collections import defaultdict
@@ -185,8 +192,19 @@ def load_signatures_from_directory(directory: Path, prefer_format: str = 'json')
     for md_file in md_files:
         sig_map[md_file.stem]['md'] = md_file
 
+    if verbose:
+        print(f"\nDeduplicating signatures (preferring {prefer_format} format)...")
+        duplicates = sum(1 for files in sig_map.values() if files['json'] and files['md'])
+        print(f"  Found {len(sig_map)} unique signatures")
+        print(f"  Resolved {duplicates} duplicates (JSON+MD pairs)")
+
     # Load one file per signature, preferring the specified format
     loaded_count = 0
+    failed_count = 0
+
+    if verbose:
+        print(f"\nLoading signature files...")
+
     for sig_name, files in sig_map.items():
         # Choose which file to load based on preference
         if prefer_format == 'json' and files['json']:
@@ -206,10 +224,18 @@ def load_signatures_from_directory(directory: Path, prefer_format: str = 'json')
             sig['_source_file'] = str(sig_file)
             signatures.append(sig)
             loaded_count += 1
+            if verbose and loaded_count % 10 == 0:
+                print(f"  Loaded {loaded_count}/{len(sig_map)} signatures...", end='\r')
         else:
-            print(f"Warning: Failed to load {sig_file}")
+            failed_count += 1
+            print(f"⚠️  Warning: Failed to load {sig_file}")
 
-    print(f"Loaded {loaded_count} unique signatures (preferring {prefer_format} format)")
+    print(f"✓ Loaded {loaded_count} unique signatures (preferring {prefer_format} format)")
+    if failed_count > 0:
+        print(f"⚠️  {failed_count} signatures failed to load")
+
+    if verbose:
+        print(f"{'='*60}\n")
 
     return signatures
 
@@ -327,21 +353,41 @@ def run_batch_analysis(signatures_dir: Path, output_dir: Path,
     Returns:
         Exit code (0 for success)
     """
-    print(f"\n{'='*60}")
-    print(f"Batch Patch Impact Analysis")
-    print(f"{'='*60}\n")
+    if verbose:
+        print(f"\n{'#'*60}")
+        print(f"# BATCH PATCH IMPACT ANALYSIS")
+        print(f"{'#'*60}")
+        print(f"Configuration:")
+        print(f"  Signatures directory: {signatures_dir}")
+        print(f"  Output directory: {output_dir}")
+        print(f"  Comparison mode: {'adjacent only' if adjacent_only else 'all pairs'}")
+        print(f"  Date field: {date_field if date_field else 'CVE ID'}")
+        print(f"  Prefer format: {prefer_format}")
+        print(f"{'#'*60}\n")
+    else:
+        print(f"\n{'='*60}")
+        print(f"Batch Patch Impact Analysis")
+        print(f"{'='*60}\n")
 
     # Load all signatures (deduplicating JSON/Markdown)
-    signatures = load_signatures_from_directory(signatures_dir, prefer_format=prefer_format)
+    signatures = load_signatures_from_directory(signatures_dir, prefer_format=prefer_format, verbose=verbose)
 
     if len(signatures) < 2:
-        print(f"Error: Need at least 2 signatures for comparison. Found {len(signatures)}")
+        print(f"❌ Error: Need at least 2 signatures for comparison. Found {len(signatures)}")
         return 1
 
+    if verbose:
+        print(f"✓ Ready to analyze {len(signatures)} CVE signatures\n")
+
     # Initialize analyzer
+    if verbose:
+        print(f"Initializing patch impact analyzer...")
     analyzer = PatchImpactAnalyzer()
 
     # Run comparisons
+    if verbose:
+        print(f"Starting comparison process...\n")
+
     results = analyzer.compare_multiple_patches(
         signatures,
         output_dir=output_dir,
@@ -351,21 +397,48 @@ def run_batch_analysis(signatures_dir: Path, output_dir: Path,
     )
 
     # Print summary
-    print(f"\n{'='*60}")
-    print(f"Batch Analysis Summary")
-    print(f"{'='*60}\n")
-    print(f"Total CVEs analyzed: {results['total_cves']}")
-    print(f"Total comparisons: {results['summary']['total_comparisons']}")
-    print(f"Average impact score: {results['summary']['average_impact_score']:.2f}")
-    print(f"Max impact score: {results['summary']['max_impact_score']:.2f}")
-    print(f"High impact pairs: {results['summary']['high_impact_count']}")
+    if verbose:
+        print(f"\n{'#'*60}")
+        print(f"# BATCH ANALYSIS COMPLETE")
+        print(f"{'#'*60}\n")
+    else:
+        print(f"\n{'='*60}")
+        print(f"Batch Analysis Summary")
+        print(f"{'='*60}\n")
+
+    print(f"📊 Analysis Statistics:")
+    print(f"  Total CVEs analyzed: {results['total_cves']}")
+    print(f"  Total plugins: {results['total_plugins']}")
+    print(f"  Total comparisons: {results['summary']['total_comparisons']}")
+    print(f"  Comparison mode: {results['comparison_mode']}")
+
+    print(f"\n📈 Impact Scores:")
+    print(f"  Average: {results['summary']['average_impact_score']:.2f}/100")
+    print(f"  Maximum: {results['summary']['max_impact_score']:.2f}/100")
+    print(f"  Minimum: {results['summary']['min_impact_score']:.2f}/100")
+
+    print(f"\n⚠️  High Impact Findings:")
+    print(f"  High impact pairs (≥60): {results['summary']['high_impact_count']}")
 
     if results['high_impact_pairs']:
-        print(f"\nHigh Impact Pairs (score >= 60):")
-        for pair in results['high_impact_pairs'][:10]:
-            print(f"  {pair['pair']}: {pair['score']:.2f} ({pair['level']})")
+        print(f"\n🔍 Top High Impact Pairs:")
+        for i, pair in enumerate(results['high_impact_pairs'][:10], 1):
+            print(f"  {i:2d}. [{pair['plugin']}] {pair['pair']}: {pair['score']:.2f} ({pair['level']})")
+        if len(results['high_impact_pairs']) > 10:
+            print(f"  ... and {len(results['high_impact_pairs']) - 10} more high impact pairs")
+    else:
+        print(f"  No high impact pairs detected")
 
-    print(f"\nResults saved to: {output_dir}")
+    print(f"\n💾 Output:")
+    print(f"  Results saved to: {output_dir}")
+    print(f"  Main report: {output_dir}/patch_impact_analysis.json")
+
+    if verbose:
+        print(f"\n{'#'*60}")
+        print(f"# ANALYSIS COMPLETE")
+        print(f"{'#'*60}\n")
+    else:
+        print(f"\n{'='*60}\n")
 
     return 0
 

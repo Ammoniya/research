@@ -51,7 +51,9 @@ class PatchImpactAnalyzer:
         cve2_id = cve2_data.get('cve', 'CVE-2')
 
         if verbose:
+            print(f"\n{'='*60}")
             print(f"Analyzing impact: {cve1_id} -> {cve2_id}")
+            print(f"{'='*60}")
 
         analysis = ImpactAnalysis(cve1=cve1_id, cve2=cve2_id)
 
@@ -61,19 +63,37 @@ class PatchImpactAnalyzer:
         cve2_pre = cve2_data.get('pre_patch_code', '')
         cve2_post = cve2_data.get('post_patch_code', '')
 
+        if verbose:
+            print(f"\nCode extraction:")
+            print(f"  CVE1 pre-patch:  {len(cve1_pre):>6} chars")
+            print(f"  CVE1 post-patch: {len(cve1_post):>6} chars")
+            print(f"  CVE2 pre-patch:  {len(cve2_pre):>6} chars")
+            print(f"  CVE2 post-patch: {len(cve2_post):>6} chars")
+
         if not cve1_post or not cve2_post:
             if verbose:
-                print("Warning: Missing patch code data")
+                print("\n⚠️  Warning: Missing patch code data - analysis incomplete")
             return analysis
 
         # Build call graphs
         if verbose:
-            print("  Building call graphs...")
+            print(f"\n[1/3] Building call graphs...")
 
         cve1_call_graph = self.call_graph_builder.build_call_graph(cve1_post, f"{cve1_id}")
         cve2_call_graph = self.call_graph_builder.build_call_graph(cve2_post, f"{cve2_id}")
 
+        if verbose:
+            print(f"  CVE1 functions: {len(cve1_call_graph.nodes)}")
+            print(f"  CVE2 functions: {len(cve2_call_graph.nodes)}")
+            cve1_total_calls = sum(len(callees) for callees in cve1_call_graph.edges.values())
+            cve2_total_calls = sum(len(callees) for callees in cve2_call_graph.edges.values())
+            print(f"  CVE1 calls: {cve1_total_calls}")
+            print(f"  CVE2 calls: {cve2_total_calls}")
+
         # Compare call graphs
+        if verbose:
+            print(f"  Comparing call graphs...")
+
         call_graph_comparison = self.call_graph_builder.compare_call_graphs(
             cve1_call_graph, cve2_call_graph
         )
@@ -82,6 +102,14 @@ class PatchImpactAnalyzer:
         analysis.call_graph_overlap = call_graph_comparison['overlap_percentage']
         analysis.upstream_impacts = call_graph_comparison['graph1_upstream']
         analysis.downstream_impacts = call_graph_comparison['graph1_downstream']
+
+        if verbose:
+            print(f"  ✓ Shared functions: {len(analysis.shared_functions)}")
+            print(f"  ✓ Call graph overlap: {analysis.call_graph_overlap:.1f}%")
+            print(f"  ✓ Upstream impacts: {len(analysis.upstream_impacts)}")
+            print(f"  ✓ Downstream impacts: {len(analysis.downstream_impacts)}")
+            if analysis.shared_functions:
+                print(f"    Examples: {', '.join(list(analysis.shared_functions)[:3])}")
 
         # Add call graph relationship
         if analysis.shared_functions:
@@ -92,15 +120,26 @@ class PatchImpactAnalyzer:
                 evidence=[f"Shared function: {func}" for func in analysis.shared_functions[:5]]
             )
             analysis.add_relationship(rel)
+            if verbose:
+                print(f"    → Added function_overlap relationship (confidence: {rel.confidence:.2f})")
 
         # Build data flow graphs
         if verbose:
-            print("  Building data flow graphs...")
+            print(f"\n[2/3] Building data flow graphs...")
 
         cve1_data_flow = self.data_flow_analyzer.build_data_flow_graph(cve1_post, f"{cve1_id}")
         cve2_data_flow = self.data_flow_analyzer.build_data_flow_graph(cve2_post, f"{cve2_id}")
 
+        if verbose:
+            print(f"  CVE1 variables: {len(cve1_data_flow.variable_flows)}")
+            print(f"  CVE2 variables: {len(cve2_data_flow.variable_flows)}")
+            print(f"  CVE1 flows: {len(cve1_data_flow.edges)}")
+            print(f"  CVE2 flows: {len(cve2_data_flow.edges)}")
+
         # Compare data flows
+        if verbose:
+            print(f"  Comparing data flows...")
+
         data_flow_comparison = self.data_flow_analyzer.compare_data_flows(
             cve1_data_flow, cve2_data_flow
         )
@@ -108,6 +147,13 @@ class PatchImpactAnalyzer:
         analysis.shared_variables = data_flow_comparison['shared_variables']
         analysis.data_flow_chains = data_flow_comparison['flow_chains']
         analysis.tainted_variables = data_flow_comparison['tainted_variables']
+
+        if verbose:
+            print(f"  ✓ Shared variables: {len(analysis.shared_variables)}")
+            print(f"  ✓ Data flow chains: {len(analysis.data_flow_chains)}")
+            print(f"  ✓ Tainted variables: {len(analysis.tainted_variables)}")
+            if analysis.shared_variables:
+                print(f"    Examples: {', '.join(list(analysis.shared_variables)[:3])}")
 
         # Add data flow relationship
         if analysis.shared_variables:
@@ -118,6 +164,8 @@ class PatchImpactAnalyzer:
                 evidence=[f"Shared variable: {var}" for var in analysis.shared_variables[:5]]
             )
             analysis.add_relationship(rel)
+            if verbose:
+                print(f"    → Added variable_overlap relationship (confidence: {rel.confidence:.2f})")
 
         # Add data flow chain relationship
         if analysis.data_flow_chains:
@@ -128,20 +176,37 @@ class PatchImpactAnalyzer:
                 evidence=[f"Flow chain: {' -> '.join(chain)}" for chain in analysis.data_flow_chains[:3]]
             )
             analysis.add_relationship(rel)
+            if verbose:
+                print(f"    → Added data_flow_chain relationship (confidence: {rel.confidence:.2f})")
+                for i, chain in enumerate(analysis.data_flow_chains[:3], 1):
+                    print(f"      Chain {i}: {' -> '.join(chain)}")
 
         # Build control flow graphs
         if verbose:
-            print("  Building control flow graphs...")
+            print(f"\n[3/3] Building control flow graphs...")
 
         cve1_cfg = self.control_flow_builder.build_control_flow_graph(cve1_post, f"{cve1_id}")
         cve2_cfg = self.control_flow_builder.build_control_flow_graph(cve2_post, f"{cve2_id}")
 
+        if verbose:
+            print(f"  CVE1 blocks: {len(cve1_cfg.nodes)}")
+            print(f"  CVE2 blocks: {len(cve2_cfg.nodes)}")
+            print(f"  CVE1 edges: {len(cve1_cfg.edges)}")
+            print(f"  CVE2 edges: {len(cve2_cfg.edges)}")
+
         # Compare control flow
+        if verbose:
+            print(f"  Comparing control flow graphs...")
+
         cfg_comparison = self.control_flow_builder.compare_control_flow_graphs(
             cve1_cfg, cve2_cfg
         )
 
         analysis.control_flow_changes = cfg_comparison['path_changes']
+
+        if verbose:
+            print(f"  ✓ Structural similarity: {cfg_comparison['structural_similarity']:.2%}")
+            print(f"  ✓ Path changes: {len(analysis.control_flow_changes)}")
 
         # Add control flow relationship
         if cfg_comparison['structural_similarity'] > 0.5:
@@ -152,10 +217,17 @@ class PatchImpactAnalyzer:
                 evidence=cfg_comparison['path_changes'][:3]
             )
             analysis.add_relationship(rel)
+            if verbose:
+                print(f"    → Added control_flow_change relationship (confidence: {rel.confidence:.2f})")
 
         # Analyze file overlap
         cve1_file = cve1_data.get('patch_location', '')
         cve2_file = cve2_data.get('patch_location', '')
+
+        if verbose:
+            print(f"\nFile overlap analysis:")
+            print(f"  CVE1 location: {cve1_file if cve1_file else '(not specified)'}")
+            print(f"  CVE2 location: {cve2_file if cve2_file else '(not specified)'}")
 
         if cve1_file and cve2_file:
             # Extract file paths from patch location
@@ -164,9 +236,19 @@ class PatchImpactAnalyzer:
 
             analysis.shared_files = list(set(cve1_files).intersection(set(cve2_files)))
 
+            if verbose:
+                print(f"  ✓ Shared files: {len(analysis.shared_files)}")
+                if analysis.shared_files:
+                    for f in analysis.shared_files:
+                        print(f"    - {f}")
+
         if verbose:
-            print(f"  Impact Score: {analysis.impact_score:.2f}")
+            print(f"\n{'='*60}")
+            print(f"Analysis complete:")
+            print(f"  Impact Score: {analysis.impact_score:.2f}/100")
             print(f"  Impact Level: {analysis.impact_level}")
+            print(f"  Relationships: {len(analysis.relationships)}")
+            print(f"{'='*60}\n")
 
         return analysis
 
@@ -247,19 +329,27 @@ class PatchImpactAnalyzer:
         from collections import defaultdict
         plugins = defaultdict(list)
 
+        if verbose:
+            print(f"\nGrouping CVEs by plugin...")
+
         for cve_data in cve_data_list:
             plugin_slug = cve_data.get('plugin_slug', 'unknown')
             plugins[plugin_slug].append(cve_data)
 
         if verbose:
-            print(f"Grouped {len(cve_data_list)} CVEs into {len(plugins)} plugins")
-            for plugin, cves in plugins.items():
-                print(f"  {plugin}: {len(cves)} CVEs")
+            print(f"✓ Grouped {len(cve_data_list)} CVEs into {len(plugins)} plugins:")
+            for plugin, cves in sorted(plugins.items(), key=lambda x: len(x[1]), reverse=True)[:10]:
+                print(f"  • {plugin}: {len(cves)} CVEs")
+            if len(plugins) > 10:
+                print(f"  ... and {len(plugins) - 10} more plugins")
 
         # Sort CVEs within each plugin chronologically
+        if verbose:
+            print(f"\nSorting CVEs chronologically within each plugin...")
+
         for plugin_slug in plugins:
             plugins[plugin_slug] = self._sort_cves_chronologically(
-                plugins[plugin_slug], date_field, verbose
+                plugins[plugin_slug], date_field, verbose=False  # Avoid duplicate verbose output
             )
 
         # Calculate total comparisons
@@ -277,7 +367,9 @@ class PatchImpactAnalyzer:
             comparison_mode = "all pairs"
 
         if verbose:
-            print(f"Will perform {total_comparisons} {comparison_mode} comparisons\n")
+            print(f"✓ Chronological sorting complete")
+            print(f"\nComparison strategy: {comparison_mode}")
+            print(f"Total comparisons to perform: {total_comparisons}\n")
 
         results = {
             'total_cves': len(cve_data_list),
@@ -290,15 +382,16 @@ class PatchImpactAnalyzer:
         }
 
         # Perform comparisons within each plugin
-        for plugin_slug, plugin_cves in plugins.items():
+        comparison_count = 0
+        for plugin_idx, (plugin_slug, plugin_cves) in enumerate(plugins.items(), 1):
             if len(plugin_cves) < 2:
                 if verbose:
-                    print(f"Skipping {plugin_slug} (only {len(plugin_cves)} CVE)")
+                    print(f"[{plugin_idx}/{len(plugins)}] Skipping {plugin_slug} (only {len(plugin_cves)} CVE)")
                 continue
 
             if verbose:
                 print(f"\n{'='*60}")
-                print(f"Analyzing plugin: {plugin_slug} ({len(plugin_cves)} CVEs)")
+                print(f"[{plugin_idx}/{len(plugins)}] Analyzing plugin: {plugin_slug} ({len(plugin_cves)} CVEs)")
                 cve_list = ', '.join([c.get('cve', 'unknown') for c in plugin_cves])
                 print(f"Chronological order: {cve_list}")
                 print(f"{'='*60}")
@@ -308,9 +401,11 @@ class PatchImpactAnalyzer:
                 for i in range(len(plugin_cves) - 1):
                     cve1 = plugin_cves[i]      # Earlier CVE
                     cve2 = plugin_cves[i + 1]  # Next CVE
+                    comparison_count += 1
 
                     if verbose:
-                        print(f"\nComparing {cve1.get('cve')} -> {cve2.get('cve')} (adjacent)")
+                        print(f"\n[Comparison {comparison_count}/{total_comparisons}]")
+                        print(f"Comparing {cve1.get('cve')} → {cve2.get('cve')} (adjacent chronological pair)")
 
                     impact = self.analyze_patch_impact(cve1, cve2, verbose=verbose)
 
@@ -336,15 +431,19 @@ class PatchImpactAnalyzer:
                             'score': impact.impact_score,
                             'level': impact.impact_level
                         })
+                        if verbose:
+                            print(f"⚠️  HIGH IMPACT DETECTED: {impact.impact_score:.2f} ({impact.impact_level})")
             else:
                 # Compare all pairs within this plugin
                 for i in range(len(plugin_cves)):
                     for j in range(i + 1, len(plugin_cves)):
                         cve1 = plugin_cves[i]
                         cve2 = plugin_cves[j]
+                        comparison_count += 1
 
                         if verbose:
-                            print(f"\nComparing {cve1.get('cve')} vs {cve2.get('cve')}")
+                            print(f"\n[Comparison {comparison_count}/{total_comparisons}]")
+                            print(f"Comparing {cve1.get('cve')} ↔ {cve2.get('cve')}")
 
                         impact = self.analyze_patch_impact(cve1, cve2, verbose=verbose)
 
@@ -370,6 +469,8 @@ class PatchImpactAnalyzer:
                                 'score': impact.impact_score,
                                 'level': impact.impact_level
                             })
+                            if verbose:
+                                print(f"⚠️  HIGH IMPACT DETECTED: {impact.impact_score:.2f} ({impact.impact_level})")
 
         # Generate summary statistics
         if results['comparisons']:
