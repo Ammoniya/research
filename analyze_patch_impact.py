@@ -6,12 +6,14 @@ This script compares two CVE patches using call graph analysis, data flow analys
 and control flow graph comparison to determine how they relate to each other.
 
 Usage:
-    python analyze_patch_impact.py --cve1 <path_to_cve1_signature.json> --cve2 <path_to_cve2_signature.json>
+    python analyze_patch_impact.py --cve1 <path_to_cve1_signature> --cve2 <path_to_cve2_signature>
     python analyze_patch_impact.py --signatures-dir <dir> --compare-all
 
+Supports both JSON (.json) and Markdown (.md) signature formats.
+
 Example:
-    python analyze_patch_impact.py --cve1 data/output/signatures/CVE-2023-1234.json \\
-                                   --cve2 data/output/signatures/CVE-2023-5678.json \\
+    python analyze_patch_impact.py --cve1 data/output/signatures/rsvp/CVE-2023-1234.md \\
+                                   --cve2 data/output/signatures/rsvp/CVE-2023-5678.md \\
                                    --output results/impact_analysis.md
 """
 
@@ -26,32 +28,117 @@ from patch_impact_analyzer import PatchImpactAnalyzer
 
 def load_cve_signature(file_path: Path) -> Optional[Dict]:
     """
-    Load CVE signature data from a JSON file.
+    Load CVE signature data from a JSON or Markdown file.
 
     Args:
-        file_path: Path to the JSON file
+        file_path: Path to the JSON or Markdown file
 
     Returns:
         Dict with CVE signature data or None if error
     """
     try:
-        with open(file_path, 'r') as f:
-            data = json.load(f)
-        return data
+        if file_path.suffix == '.json':
+            with open(file_path, 'r') as f:
+                data = json.load(f)
+            return data
+        elif file_path.suffix == '.md':
+            # Parse markdown format
+            return parse_markdown_signature(file_path)
+        else:
+            print(f"Warning: Unsupported file format: {file_path.suffix}")
+            return None
     except FileNotFoundError:
         print(f"Error: File not found: {file_path}")
         return None
     except json.JSONDecodeError:
         print(f"Error: Invalid JSON in file: {file_path}")
         return None
+    except Exception as e:
+        print(f"Error loading {file_path}: {e}")
+        return None
+
+
+def parse_markdown_signature(file_path: Path) -> Optional[Dict]:
+    """
+    Parse a markdown signature file to extract CVE data.
+
+    Args:
+        file_path: Path to the markdown file
+
+    Returns:
+        Dict with CVE signature data
+    """
+    import re
+
+    try:
+        with open(file_path, 'r', encoding='utf-8') as f:
+            content = f.read()
+
+        # Extract CVE/title from header
+        cve_match = re.search(r'^#\s+(.+?)$', content, re.MULTILINE)
+        cve = cve_match.group(1) if cve_match else file_path.stem
+
+        # Extract plugin slug
+        plugin_match = re.search(r'\*\*Plugin\*\*:\s*(.+?)$', content, re.MULTILINE)
+        plugin_slug = plugin_match.group(1).strip() if plugin_match else 'unknown'
+
+        # Extract vulnerability type
+        type_match = re.search(r'\*\*Type\*\*:\s*(.+?)$', content, re.MULTILINE)
+        vuln_type = type_match.group(1).strip() if type_match else 'Unknown'
+
+        # Extract title
+        title_match = re.search(r'\*\*Title\*\*:\s*(.+?)$', content, re.MULTILINE)
+        title = title_match.group(1).strip() if title_match else ''
+
+        # Extract patch location
+        patch_match = re.search(r'\*\*Patch\*\*:\s*(.+?)$', content, re.MULTILINE)
+        patch_location = patch_match.group(1).strip() if patch_match else ''
+
+        # Extract pre-patch code
+        pre_patch_match = re.search(
+            r'## Pre-Patch Code.*?```(?:php)?\n(.*?)\n```',
+            content,
+            re.DOTALL
+        )
+        pre_patch_code = pre_patch_match.group(1) if pre_patch_match else ''
+
+        # Extract post-patch code
+        post_patch_match = re.search(
+            r'## Post-Patch Code.*?```(?:php)?\n(.*?)\n```',
+            content,
+            re.DOTALL
+        )
+        post_patch_code = post_patch_match.group(1) if post_patch_match else ''
+
+        # Extract unified diff
+        diff_match = re.search(
+            r'## Unified Diff.*?```(?:diff)?\n(.*?)\n```',
+            content,
+            re.DOTALL
+        )
+        unified_diff = diff_match.group(1) if diff_match else ''
+
+        return {
+            'cve': cve,
+            'plugin_slug': plugin_slug,
+            'vuln_type': vuln_type,
+            'title': title,
+            'patch_location': patch_location,
+            'pre_patch_code': pre_patch_code,
+            'post_patch_code': post_patch_code,
+            'unified_diff': unified_diff
+        }
+    except Exception as e:
+        print(f"Error parsing markdown {file_path}: {e}")
+        return None
 
 
 def load_signatures_from_directory(directory: Path) -> List[Dict]:
     """
-    Load all CVE signatures from a directory.
+    Load all CVE signatures from a directory (searches recursively).
 
     Args:
-        directory: Directory containing signature JSON files
+        directory: Directory containing signature JSON or Markdown files
 
     Returns:
         List of signature dicts
@@ -62,13 +149,21 @@ def load_signatures_from_directory(directory: Path) -> List[Dict]:
         print(f"Error: Directory not found: {directory}")
         return signatures
 
-    json_files = list(directory.glob("*.json"))
-    print(f"Found {len(json_files)} signature files in {directory}")
+    # Search recursively for both JSON and Markdown files
+    json_files = list(directory.rglob("*.json"))
+    md_files = list(directory.rglob("*.md"))
 
-    for json_file in json_files:
-        sig = load_cve_signature(json_file)
+    all_files = json_files + md_files
+    print(f"Found {len(all_files)} signature files in {directory} ({len(json_files)} JSON, {len(md_files)} Markdown)")
+
+    for sig_file in all_files:
+        sig = load_cve_signature(sig_file)
         if sig:
+            # Add file path for reference
+            sig['_source_file'] = str(sig_file)
             signatures.append(sig)
+        else:
+            print(f"Warning: Failed to load {sig_file}")
 
     return signatures
 
@@ -322,19 +417,19 @@ def main():
     parser.add_argument(
         '--cve1',
         type=Path,
-        help='Path to first CVE signature JSON file'
+        help='Path to first CVE signature file (JSON or Markdown)'
     )
 
     parser.add_argument(
         '--cve2',
         type=Path,
-        help='Path to second CVE signature JSON file'
+        help='Path to second CVE signature file (JSON or Markdown)'
     )
 
     parser.add_argument(
         '--signatures-dir',
         type=Path,
-        help='Directory containing signature files for batch analysis'
+        help='Directory containing signature files for batch analysis (searches recursively for .json and .md files)'
     )
 
     parser.add_argument(
