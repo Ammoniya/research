@@ -286,8 +286,7 @@ def run_batch_analysis(signatures_dir: Path, output_dir: Path,
         print(f"Error: Need at least 2 signatures for comparison. Found {len(signatures)}")
         return 1
 
-    print(f"Loaded {len(signatures)} signatures")
-    print(f"Will perform {len(signatures) * (len(signatures) - 1) // 2} comparisons\n")
+    print(f"Loaded {len(signatures)} signatures\n")
 
     # Initialize analyzer
     analyzer = PatchImpactAnalyzer()

@@ -226,6 +226,8 @@ class PatchImpactAnalyzer:
         """
         Compare multiple CVE patches to find relationships.
 
+        Only compares CVEs within the same plugin to find related vulnerabilities.
+
         Args:
             cve_data_list: List of CVE patch data dicts
             output_dir: Optional directory to save results
@@ -234,46 +236,81 @@ class PatchImpactAnalyzer:
         Returns:
             Dict with all pairwise comparisons
         """
+        # Group CVEs by plugin
+        from collections import defaultdict
+        plugins = defaultdict(list)
+
+        for cve_data in cve_data_list:
+            plugin_slug = cve_data.get('plugin_slug', 'unknown')
+            plugins[plugin_slug].append(cve_data)
+
         if verbose:
-            print(f"Comparing {len(cve_data_list)} CVE patches...")
+            print(f"Grouped {len(cve_data_list)} CVEs into {len(plugins)} plugins")
+            for plugin, cves in plugins.items():
+                print(f"  {plugin}: {len(cves)} CVEs")
+
+        # Calculate total comparisons
+        total_comparisons = sum(
+            len(cves) * (len(cves) - 1) // 2
+            for cves in plugins.values()
+        )
+
+        if verbose:
+            print(f"Will perform {total_comparisons} within-plugin comparisons\n")
 
         results = {
             'total_cves': len(cve_data_list),
+            'total_plugins': len(plugins),
+            'plugin_groups': {plugin: len(cves) for plugin, cves in plugins.items()},
             'comparisons': [],
             'high_impact_pairs': [],
             'summary': {}
         }
 
-        # Perform pairwise comparisons
-        for i in range(len(cve_data_list)):
-            for j in range(i + 1, len(cve_data_list)):
-                cve1 = cve_data_list[i]
-                cve2 = cve_data_list[j]
-
+        # Perform pairwise comparisons within each plugin
+        for plugin_slug, plugin_cves in plugins.items():
+            if len(plugin_cves) < 2:
                 if verbose:
-                    print(f"\nComparing {cve1.get('cve')} vs {cve2.get('cve')}")
+                    print(f"Skipping {plugin_slug} (only {len(plugin_cves)} CVE)")
+                continue
 
-                impact = self.analyze_patch_impact(cve1, cve2, verbose=verbose)
+            if verbose:
+                print(f"\n{'='*60}")
+                print(f"Analyzing plugin: {plugin_slug} ({len(plugin_cves)} CVEs)")
+                print(f"{'='*60}")
 
-                comparison = {
-                    'cve1': cve1.get('cve'),
-                    'cve2': cve2.get('cve'),
-                    'impact_score': impact.impact_score,
-                    'impact_level': impact.impact_level,
-                    'shared_functions': len(impact.shared_functions),
-                    'shared_variables': len(impact.shared_variables),
-                    'relationships': len(impact.relationships)
-                }
+            # Compare CVEs within this plugin
+            for i in range(len(plugin_cves)):
+                for j in range(i + 1, len(plugin_cves)):
+                    cve1 = plugin_cves[i]
+                    cve2 = plugin_cves[j]
 
-                results['comparisons'].append(comparison)
+                    if verbose:
+                        print(f"\nComparing {cve1.get('cve')} vs {cve2.get('cve')}")
 
-                # Track high impact pairs
-                if impact.impact_score >= 60:
-                    results['high_impact_pairs'].append({
-                        'pair': f"{cve1.get('cve')} <-> {cve2.get('cve')}",
-                        'score': impact.impact_score,
-                        'level': impact.impact_level
-                    })
+                    impact = self.analyze_patch_impact(cve1, cve2, verbose=verbose)
+
+                    comparison = {
+                        'plugin': plugin_slug,
+                        'cve1': cve1.get('cve'),
+                        'cve2': cve2.get('cve'),
+                        'impact_score': impact.impact_score,
+                        'impact_level': impact.impact_level,
+                        'shared_functions': len(impact.shared_functions),
+                        'shared_variables': len(impact.shared_variables),
+                        'relationships': len(impact.relationships)
+                    }
+
+                    results['comparisons'].append(comparison)
+
+                    # Track high impact pairs
+                    if impact.impact_score >= 60:
+                        results['high_impact_pairs'].append({
+                            'plugin': plugin_slug,
+                            'pair': f"{cve1.get('cve')} <-> {cve2.get('cve')}",
+                            'score': impact.impact_score,
+                            'level': impact.impact_level
+                        })
 
         # Generate summary statistics
         if results['comparisons']:
@@ -284,6 +321,14 @@ class PatchImpactAnalyzer:
                 'min_impact_score': min(scores),
                 'high_impact_count': len(results['high_impact_pairs']),
                 'total_comparisons': len(results['comparisons'])
+            }
+        else:
+            results['summary'] = {
+                'average_impact_score': 0.0,
+                'max_impact_score': 0.0,
+                'min_impact_score': 0.0,
+                'high_impact_count': 0,
+                'total_comparisons': 0
             }
 
         # Save results if output directory specified
