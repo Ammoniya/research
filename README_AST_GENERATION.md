@@ -55,20 +55,6 @@ export SVN_REPOS_DIR=~/wordpress-svn
 rsync -avz --delete plugins.svn.wordpress.org::plugin-repository /path/to/svn_wordpress_org/
 ```
 
-## Quick Start Example
-
-For programmatic usage examples, see `example_ast_generation.py`:
-```bash
-python example_ast_generation.py
-```
-
-This file contains multiple examples showing how to:
-- Generate ASTs for single plugins
-- Process multiple plugins at once
-- Use specific versions
-- Customize output directories
-- Inspect generated results
-
 ## Usage
 
 ### 1. Generate ASTs for Top Plugins
