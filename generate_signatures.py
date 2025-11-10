@@ -193,6 +193,27 @@ def main():
             )
 
             if signature:
+                # Generate AST signatures from actual files
+                print(f"    [*] Generating AST signatures from actual files...")
+                try:
+                    ast_sigs = generator.generate_ast_signatures_from_files(
+                        plugin_slug, vuln_version, fixed_version, diff
+                    )
+
+                    if ast_sigs:
+                        # Add AST signatures to the signature
+                        signature.ast_signatures = ast_sigs
+                        print(f"    [+] Generated {len(ast_sigs)} AST signature(s)")
+
+                        # Show security functions
+                        for i, ast_sig in enumerate(ast_sigs, 1):
+                            if ast_sig.get('security_functions_added'):
+                                print(f"        [{i}] Security functions added: {', '.join(ast_sig['security_functions_added'])}")
+                            print(f"        [{i}] Pattern type: {ast_sig.get('pattern_type', 'unknown')}")
+
+                except Exception as e:
+                    print(f"    [!] AST signature generation failed: {e}")
+
                 # Save signature immediately
                 filepath = storage.save_signature(signature)
 
