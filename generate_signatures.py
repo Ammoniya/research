@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """
-WordPress Vulnerability Signature Generator v2.0
+WordPress Vulnerability Diff Extractor v3.0-simplified
 
-Enhanced modular version with better pattern detection, validation, and resume capability.
+Simplified version that extracts pre-patch code, post-patch code, and unified diffs
+without complex pattern detection or scoring.
 """
 
 import json
@@ -54,7 +55,7 @@ def main():
     signal.signal(signal.SIGINT, signal_handler)
     signal.signal(signal.SIGTERM, signal_handler)
 
-    print("=== WordPress Vulnerability Signature Generator v2.0 ===\n")
+    print("=== WordPress Vulnerability Diff Extractor v3.0-simplified ===\n")
 
     # Initialize configuration
     print("[*] Initializing configuration...")
@@ -101,9 +102,6 @@ def main():
         'success': 0,
         'failed': 0,
         'skipped': len(processed_ids),
-        'high_quality': 0,
-        'medium_quality': 0,
-        'low_quality': 0,
     }
 
     # Process vulnerabilities
@@ -190,32 +188,22 @@ def main():
                 continue
 
             # Generate signature
-            signature = generator.generate_signature(vuln_info, diff)
+            signature = generator.generate_signature(
+                vuln_info, diff, vuln_version, fixed_version
+            )
 
             if signature:
                 # Save signature immediately
                 filepath = storage.save_signature(signature)
 
-                quality = signature.context.get('quality_score', 0)
-                if quality >= 0.8:
-                    stats['high_quality'] += 1
-                    quality_label = "HIGH"
-                elif quality >= 0.5:
-                    stats['medium_quality'] += 1
-                    quality_label = "MEDIUM"
-                else:
-                    stats['low_quality'] += 1
-                    quality_label = "LOW"
-
                 print(f"    [+] Signature saved: {filepath}")
-                print(f"    [+] Pattern: {signature.pattern}")
-                print(f"    [+] Exploitability: {signature.exploitability_score:.1f}/10")
-                print(f"    [+] Quality: {quality:.2f} ({quality_label})")
-                print(f"    [+] Validation: {'✓ PASSED' if signature.validated else '✗ FAILED'}")
+                print(f"    [+] Patch location: {signature.patch_location}")
+                print(f"    [+] Files changed: {signature.files_changed}")
+                print(f"    [+] Lines +{signature.lines_added} -{signature.lines_removed}")
 
                 stats['success'] += 1
             else:
-                print(f"    [-] No signature pattern detected")
+                print(f"    [-] Failed to extract diff")
                 stats['failed'] += 1
 
             # Mark as processed
@@ -246,17 +234,11 @@ def main():
         success_rate = (stats['success'] / stats['processed']) * 100
         print(f"Success rate: {success_rate:.1f}%")
 
-    print(f"\n=== Quality Distribution ===")
-    print(f"High quality (≥0.8): {stats['high_quality']}")
-    print(f"Medium quality (≥0.5): {stats['medium_quality']}")
-    print(f"Low quality (<0.5): {stats['low_quality']}")
-
     print(f"\n=== Signature Database Statistics ===")
     print(f"Total signatures: {gen_stats['total_signatures']}")
-    print(f"Average exploitability: {gen_stats['avg_exploitability_score']:.2f}/10")
-    print(f"Average quality: {gen_stats['avg_quality_score']:.2f}")
-    print(f"Critical signatures (≥8.0): {gen_stats['critical_signatures']}")
-    print(f"High confidence signatures: {gen_stats['high_confidence_signatures']}")
+    print(f"Average files changed: {gen_stats['avg_files_changed']:.1f}")
+    print(f"Average lines added: {gen_stats['avg_lines_added']:.1f}")
+    print(f"Average lines removed: {gen_stats['avg_lines_removed']:.1f}")
 
     print(f"\n=== Top Vulnerability Types ===")
     top_types = sorted(
