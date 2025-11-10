@@ -100,13 +100,14 @@ class ControlFlowGraphBuilder:
         }
 
     def get_execution_paths(self, cfg: ControlFlowGraph,
-                           max_paths: int = 100) -> List[List[int]]:
+                           max_paths: int = 100, max_depth: int = 100) -> List[List[int]]:
         """
         Get all possible execution paths through the CFG.
 
         Args:
             cfg: Control flow graph
             max_paths: Maximum number of paths to return
+            max_depth: Maximum depth of path traversal (prevents stack overflow)
 
         Returns:
             List of paths (each path is a list of node IDs)
@@ -115,7 +116,7 @@ class ControlFlowGraphBuilder:
             return []
 
         paths = []
-        self._traverse_paths(cfg, cfg.entry_node, [], paths, max_paths)
+        self._traverse_paths(cfg, cfg.entry_node, [], paths, max_paths, visited=None, depth=0, max_depth=max_depth)
 
         return paths
 
@@ -380,7 +381,8 @@ class ControlFlowGraphBuilder:
 
     def _traverse_paths(self, cfg: ControlFlowGraph, current_node: int,
                        current_path: List[int], all_paths: List[List[int]],
-                       max_paths: int, visited: Optional[Set[int]] = None):
+                       max_paths: int, visited: Optional[Set[int]] = None,
+                       depth: int = 0, max_depth: int = 100):
         """
         Recursively traverse the CFG to find all paths.
 
@@ -391,18 +393,30 @@ class ControlFlowGraphBuilder:
             all_paths: Accumulator for all paths
             max_paths: Maximum number of paths to find
             visited: Set of visited nodes (for cycle detection)
+            depth: Current recursion depth
+            max_depth: Maximum recursion depth allowed
         """
+        # Early termination checks
         if len(all_paths) >= max_paths:
+            return
+
+        # Prevent stack overflow by limiting recursion depth
+        if depth >= max_depth:
+            # Reached max depth, save current path and stop
+            if current_path:
+                all_paths.append(current_path + [current_node])
             return
 
         if visited is None:
             visited = set()
 
-        # Avoid infinite loops
+        # Avoid infinite loops - if we've seen this node in current path, we have a cycle
         if current_node in visited:
+            # Save path with cycle detected and stop this branch
             all_paths.append(current_path + [current_node])
             return
 
+        # Create a new visited set for this path branch
         visited = visited.copy()
         visited.add(current_node)
 
@@ -415,6 +429,9 @@ class ControlFlowGraphBuilder:
             # This is an exit node
             all_paths.append(current_path)
         else:
-            # Continue traversal
+            # Continue traversal to successors
             for succ in successors:
-                self._traverse_paths(cfg, succ, current_path, all_paths, max_paths, visited)
+                # Check if we've already found enough paths before recursing
+                if len(all_paths) >= max_paths:
+                    break
+                self._traverse_paths(cfg, succ, current_path, all_paths, max_paths, visited, depth + 1, max_depth)
