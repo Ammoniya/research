@@ -21,6 +21,7 @@ INPUT_WORDFENCE_DB = INPUT_DIR / "wordfence_db.json"
 
 # Output directories
 OUTPUT_SIGNATURES_DIR = OUTPUT_DIR / "signatures"
+OUTPUT_AST_SIGNATURES_DIR = OUTPUT_DIR / "ast_signatures"
 OUTPUT_MINING_DIR = OUTPUT_DIR / "mining_results"
 OUTPUT_FUZZ_DIR = OUTPUT_DIR / "fuzz_results"
 OUTPUT_REPORTS_DIR = OUTPUT_DIR / "reports"
@@ -49,6 +50,7 @@ def ensure_data_directories():
         INPUT_DIR,
         OUTPUT_DIR,
         OUTPUT_SIGNATURES_DIR,
+        OUTPUT_AST_SIGNATURES_DIR,
         OUTPUT_MINING_DIR,
         MINING_TIMELINES_DIR,
         MINING_ZERO_DAYS_DIR,
@@ -84,6 +86,26 @@ def get_signature_file_path(plugin_slug: str, identifier: str) -> Path:
         return plugin_dir / f"{identifier}.json"
     else:
         return plugin_dir / f"vuln_{identifier}.json"
+
+
+def get_ast_signature_file_path(plugin_slug: str, identifier: str) -> Path:
+    """
+    Get the path for an AST signature file.
+
+    Args:
+        plugin_slug: The plugin slug
+        identifier: CVE ID or vulnerability hash
+
+    Returns:
+        Path object for the AST signature file
+    """
+    plugin_dir = OUTPUT_AST_SIGNATURES_DIR / plugin_slug
+    plugin_dir.mkdir(parents=True, exist_ok=True)
+
+    if identifier.startswith("CVE-"):
+        return plugin_dir / f"{identifier}_ast.json"
+    else:
+        return plugin_dir / f"vuln_{identifier}_ast.json"
 
 
 def get_zero_day_file_path(plugin_slug: str, signature_id: str) -> Path:
