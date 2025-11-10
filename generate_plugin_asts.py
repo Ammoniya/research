@@ -156,9 +156,18 @@ class PluginASTGenerator:
             # Get function definitions
             functions = self.ast_parser.get_changed_functions(ast)
 
+            # Convert ASTNode objects to dictionaries for JSON serialization
             return {
-                'ast': simplified_ast,
-                'functions': functions,
+                'ast': simplified_ast.to_dict(),
+                'functions': [
+                    {
+                        'name': self._extract_function_name(func),
+                        'start_line': func.start_point[0],
+                        'end_line': func.end_point[0],
+                        'ast': func.to_dict()
+                    }
+                    for func in functions
+                ],
                 'file_size': len(code),
                 'parse_timestamp': datetime.now().isoformat()
             }
@@ -166,6 +175,31 @@ class PluginASTGenerator:
         except Exception as e:
             logger.error(f"Error parsing {file_path}: {e}")
             return None
+
+    def _extract_function_name(self, func_node) -> str:
+        """
+        Extract the function name from a function AST node.
+
+        Args:
+            func_node: ASTNode representing a function
+
+        Returns:
+            Function name or 'anonymous'
+        """
+        try:
+            # Look for 'name' field in children
+            for child in func_node.children:
+                if child.field_name == 'name':
+                    return child.text.strip()
+
+            # Fallback: try to find identifier node
+            for child in func_node.children:
+                if child.node_type == 'name':
+                    return child.text.strip()
+
+            return 'anonymous'
+        except Exception:
+            return 'anonymous'
 
     def generate_asts_for_plugin(self, plugin_slug: str, version: str) -> bool:
         """
