@@ -2,19 +2,36 @@
 """
 Analyze the impact of one CVE patch on another.
 
-This script compares two CVE patches using call graph analysis, data flow analysis,
+This script compares CVE patches using call graph analysis, data flow analysis,
 and control flow graph comparison to determine how they relate to each other.
 
 Usage:
-    python analyze_patch_impact.py --cve1 <path_to_cve1_signature> --cve2 <path_to_cve2_signature>
+    # Compare two specific CVEs
+    python analyze_patch_impact.py --cve1 <path_to_cve1> --cve2 <path_to_cve2>
+
+    # Compare all CVEs within each plugin (only adjacent chronological pairs)
     python analyze_patch_impact.py --signatures-dir <dir> --compare-all
 
-Supports both JSON (.json) and Markdown (.md) signature formats.
+    # Compare all pairs within each plugin
+    python analyze_patch_impact.py --signatures-dir <dir> --compare-all --all-pairs
 
-Example:
-    python analyze_patch_impact.py --cve1 data/output/signatures/rsvp/CVE-2023-1234.md \\
-                                   --cve2 data/output/signatures/rsvp/CVE-2023-5678.md \\
+Supports both JSON (.json) and Markdown (.md) signature formats.
+When both formats exist, JSON is preferred by default (use --prefer-format to change).
+
+Examples:
+    # Pairwise comparison
+    python analyze_patch_impact.py --cve1 signatures/plugin/CVE-2023-1234.md \\
+                                   --cve2 signatures/plugin/CVE-2023-5678.md \\
                                    --output results/impact_analysis.md
+
+    # Batch analysis (adjacent CVEs only - default)
+    python analyze_patch_impact.py --signatures-dir data/output/signatures \\
+                                   --compare-all \\
+                                   --output-dir data/output/impact_analysis
+
+    # Batch analysis (all pairs)
+    python analyze_patch_impact.py --signatures-dir data/output/signatures \\
+                                   --compare-all --all-pairs
 """
 
 import argparse
@@ -133,12 +150,15 @@ def parse_markdown_signature(file_path: Path) -> Optional[Dict]:
         return None
 
 
-def load_signatures_from_directory(directory: Path) -> List[Dict]:
+def load_signatures_from_directory(directory: Path, prefer_format: str = 'json') -> List[Dict]:
     """
     Load all CVE signatures from a directory (searches recursively).
 
+    Deduplicates signatures by preferring one format when both JSON and Markdown exist.
+
     Args:
         directory: Directory containing signature JSON or Markdown files
+        prefer_format: 'json' or 'markdown' - format to prefer when both exist
 
     Returns:
         List of signature dicts
@@ -153,17 +173,43 @@ def load_signatures_from_directory(directory: Path) -> List[Dict]:
     json_files = list(directory.rglob("*.json"))
     md_files = list(directory.rglob("*.md"))
 
-    all_files = json_files + md_files
-    print(f"Found {len(all_files)} signature files in {directory} ({len(json_files)} JSON, {len(md_files)} Markdown)")
+    print(f"Found {len(json_files)} JSON and {len(md_files)} Markdown signature files in {directory}")
 
-    for sig_file in all_files:
+    # Build a map of signature stem -> files to deduplicate
+    from collections import defaultdict
+    sig_map = defaultdict(lambda: {'json': None, 'md': None})
+
+    for json_file in json_files:
+        sig_map[json_file.stem]['json'] = json_file
+
+    for md_file in md_files:
+        sig_map[md_file.stem]['md'] = md_file
+
+    # Load one file per signature, preferring the specified format
+    loaded_count = 0
+    for sig_name, files in sig_map.items():
+        # Choose which file to load based on preference
+        if prefer_format == 'json' and files['json']:
+            sig_file = files['json']
+        elif prefer_format == 'markdown' and files['md']:
+            sig_file = files['md']
+        elif files['json']:
+            sig_file = files['json']
+        elif files['md']:
+            sig_file = files['md']
+        else:
+            continue
+
         sig = load_cve_signature(sig_file)
         if sig:
             # Add file path for reference
             sig['_source_file'] = str(sig_file)
             signatures.append(sig)
+            loaded_count += 1
         else:
             print(f"Warning: Failed to load {sig_file}")
+
+    print(f"Loaded {loaded_count} unique signatures (preferring {prefer_format} format)")
 
     return signatures
 
@@ -263,14 +309,20 @@ def run_pairwise_analysis(cve1_path: Path, cve2_path: Path,
 
 
 def run_batch_analysis(signatures_dir: Path, output_dir: Path,
-                      verbose: bool = False) -> int:
+                      verbose: bool = False,
+                      adjacent_only: bool = True,
+                      date_field: str = None,
+                      prefer_format: str = 'json') -> int:
     """
-    Run impact analysis on all pairs of signatures in a directory.
+    Run impact analysis on signatures in a directory.
 
     Args:
         signatures_dir: Directory containing signature files
         output_dir: Directory to save results
         verbose: Whether to print verbose output
+        adjacent_only: Only compare chronologically adjacent CVEs within each plugin
+        date_field: Field name for date/timestamp sorting (None = use CVE ID)
+        prefer_format: 'json' or 'markdown' when both formats exist
 
     Returns:
         Exit code (0 for success)
@@ -279,14 +331,12 @@ def run_batch_analysis(signatures_dir: Path, output_dir: Path,
     print(f"Batch Patch Impact Analysis")
     print(f"{'='*60}\n")
 
-    # Load all signatures
-    signatures = load_signatures_from_directory(signatures_dir)
+    # Load all signatures (deduplicating JSON/Markdown)
+    signatures = load_signatures_from_directory(signatures_dir, prefer_format=prefer_format)
 
     if len(signatures) < 2:
         print(f"Error: Need at least 2 signatures for comparison. Found {len(signatures)}")
         return 1
-
-    print(f"Loaded {len(signatures)} signatures\n")
 
     # Initialize analyzer
     analyzer = PatchImpactAnalyzer()
@@ -295,7 +345,9 @@ def run_batch_analysis(signatures_dir: Path, output_dir: Path,
     results = analyzer.compare_multiple_patches(
         signatures,
         output_dir=output_dir,
-        verbose=verbose
+        verbose=verbose,
+        adjacent_only=adjacent_only,
+        date_field=date_field
     )
 
     # Print summary
@@ -462,6 +514,27 @@ def main():
         help='Enable verbose output'
     )
 
+    parser.add_argument(
+        '--all-pairs',
+        action='store_true',
+        help='Compare all pairs of CVEs within each plugin (default: only adjacent chronological pairs)'
+    )
+
+    parser.add_argument(
+        '--date-field',
+        type=str,
+        default=None,
+        help='Field name containing release date/timestamp for chronological sorting (default: use CVE ID)'
+    )
+
+    parser.add_argument(
+        '--prefer-format',
+        type=str,
+        choices=['json', 'markdown'],
+        default='json',
+        help='Preferred format when both JSON and Markdown exist for a signature (default: json)'
+    )
+
     args = parser.parse_args()
 
     # Validate arguments
@@ -472,7 +545,14 @@ def main():
         if not args.signatures_dir:
             print("Error: --signatures-dir required for batch analysis")
             return 1
-        return run_batch_analysis(args.signatures_dir, args.output_dir, verbose=args.verbose)
+        return run_batch_analysis(
+            args.signatures_dir,
+            args.output_dir,
+            verbose=args.verbose,
+            adjacent_only=not args.all_pairs,  # --all-pairs inverts the default
+            date_field=args.date_field,
+            prefer_format=args.prefer_format
+        )
 
     if args.cve1 and args.cve2:
         return run_pairwise_analysis(args.cve1, args.cve2, args.output, verbose=args.verbose)

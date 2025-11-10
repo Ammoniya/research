@@ -222,16 +222,23 @@ class PatchImpactAnalyzer:
     def compare_multiple_patches(self,
                                 cve_data_list: List[Dict],
                                 output_dir: Optional[Path] = None,
-                                verbose: bool = False) -> Dict:
+                                verbose: bool = False,
+                                adjacent_only: bool = True,
+                                date_field: str = None) -> Dict:
         """
         Compare multiple CVE patches to find relationships.
 
-        Only compares CVEs within the same plugin to find related vulnerabilities.
+        Only compares CVEs within the same plugin. By default, compares only
+        adjacent CVEs in chronological order (how each patch impacts the next).
 
         Args:
             cve_data_list: List of CVE patch data dicts
             output_dir: Optional directory to save results
             verbose: Whether to print verbose output
+            adjacent_only: If True, only compare chronologically adjacent CVEs.
+                          If False, compare all pairs within each plugin.
+            date_field: Field name containing release date/timestamp for sorting.
+                       If None, uses CVE ID for chronological ordering.
 
         Returns:
             Dict with all pairwise comparisons
@@ -249,25 +256,40 @@ class PatchImpactAnalyzer:
             for plugin, cves in plugins.items():
                 print(f"  {plugin}: {len(cves)} CVEs")
 
+        # Sort CVEs within each plugin chronologically
+        for plugin_slug in plugins:
+            plugins[plugin_slug] = self._sort_cves_chronologically(
+                plugins[plugin_slug], date_field, verbose
+            )
+
         # Calculate total comparisons
-        total_comparisons = sum(
-            len(cves) * (len(cves) - 1) // 2
-            for cves in plugins.values()
-        )
+        if adjacent_only:
+            total_comparisons = sum(
+                max(0, len(cves) - 1)  # n-1 adjacent pairs
+                for cves in plugins.values()
+            )
+            comparison_mode = "adjacent (chronological)"
+        else:
+            total_comparisons = sum(
+                len(cves) * (len(cves) - 1) // 2  # all pairs
+                for cves in plugins.values()
+            )
+            comparison_mode = "all pairs"
 
         if verbose:
-            print(f"Will perform {total_comparisons} within-plugin comparisons\n")
+            print(f"Will perform {total_comparisons} {comparison_mode} comparisons\n")
 
         results = {
             'total_cves': len(cve_data_list),
             'total_plugins': len(plugins),
             'plugin_groups': {plugin: len(cves) for plugin, cves in plugins.items()},
+            'comparison_mode': comparison_mode,
             'comparisons': [],
             'high_impact_pairs': [],
             'summary': {}
         }
 
-        # Perform pairwise comparisons within each plugin
+        # Perform comparisons within each plugin
         for plugin_slug, plugin_cves in plugins.items():
             if len(plugin_cves) < 2:
                 if verbose:
@@ -277,16 +299,18 @@ class PatchImpactAnalyzer:
             if verbose:
                 print(f"\n{'='*60}")
                 print(f"Analyzing plugin: {plugin_slug} ({len(plugin_cves)} CVEs)")
+                cve_list = ', '.join([c.get('cve', 'unknown') for c in plugin_cves])
+                print(f"Chronological order: {cve_list}")
                 print(f"{'='*60}")
 
-            # Compare CVEs within this plugin
-            for i in range(len(plugin_cves)):
-                for j in range(i + 1, len(plugin_cves)):
-                    cve1 = plugin_cves[i]
-                    cve2 = plugin_cves[j]
+            if adjacent_only:
+                # Only compare adjacent CVEs in chronological order
+                for i in range(len(plugin_cves) - 1):
+                    cve1 = plugin_cves[i]      # Earlier CVE
+                    cve2 = plugin_cves[i + 1]  # Next CVE
 
                     if verbose:
-                        print(f"\nComparing {cve1.get('cve')} vs {cve2.get('cve')}")
+                        print(f"\nComparing {cve1.get('cve')} -> {cve2.get('cve')} (adjacent)")
 
                     impact = self.analyze_patch_impact(cve1, cve2, verbose=verbose)
 
@@ -294,6 +318,7 @@ class PatchImpactAnalyzer:
                         'plugin': plugin_slug,
                         'cve1': cve1.get('cve'),
                         'cve2': cve2.get('cve'),
+                        'temporal_relationship': 'adjacent',
                         'impact_score': impact.impact_score,
                         'impact_level': impact.impact_level,
                         'shared_functions': len(impact.shared_functions),
@@ -307,10 +332,44 @@ class PatchImpactAnalyzer:
                     if impact.impact_score >= 60:
                         results['high_impact_pairs'].append({
                             'plugin': plugin_slug,
-                            'pair': f"{cve1.get('cve')} <-> {cve2.get('cve')}",
+                            'pair': f"{cve1.get('cve')} -> {cve2.get('cve')}",
                             'score': impact.impact_score,
                             'level': impact.impact_level
                         })
+            else:
+                # Compare all pairs within this plugin
+                for i in range(len(plugin_cves)):
+                    for j in range(i + 1, len(plugin_cves)):
+                        cve1 = plugin_cves[i]
+                        cve2 = plugin_cves[j]
+
+                        if verbose:
+                            print(f"\nComparing {cve1.get('cve')} vs {cve2.get('cve')}")
+
+                        impact = self.analyze_patch_impact(cve1, cve2, verbose=verbose)
+
+                        comparison = {
+                            'plugin': plugin_slug,
+                            'cve1': cve1.get('cve'),
+                            'cve2': cve2.get('cve'),
+                            'temporal_relationship': 'all-pairs',
+                            'impact_score': impact.impact_score,
+                            'impact_level': impact.impact_level,
+                            'shared_functions': len(impact.shared_functions),
+                            'shared_variables': len(impact.shared_variables),
+                            'relationships': len(impact.relationships)
+                        }
+
+                        results['comparisons'].append(comparison)
+
+                        # Track high impact pairs
+                        if impact.impact_score >= 60:
+                            results['high_impact_pairs'].append({
+                                'plugin': plugin_slug,
+                                'pair': f"{cve1.get('cve')} <-> {cve2.get('cve')}",
+                                'score': impact.impact_score,
+                                'level': impact.impact_level
+                            })
 
         # Generate summary statistics
         if results['comparisons']:
@@ -344,6 +403,57 @@ class PatchImpactAnalyzer:
                 print(f"\nResults saved to {output_file}")
 
         return results
+
+    def _sort_cves_chronologically(self,
+                                   cves: List[Dict],
+                                   date_field: str = None,
+                                   verbose: bool = False) -> List[Dict]:
+        """
+        Sort CVEs in chronological order (earliest to latest).
+
+        Args:
+            cves: List of CVE data dicts
+            date_field: Optional field name containing date/timestamp
+            verbose: Whether to print verbose output
+
+        Returns:
+            Sorted list of CVEs
+        """
+        import re
+        from datetime import datetime
+
+        def get_sort_key(cve_data):
+            # If date field specified and exists, use it
+            if date_field and date_field in cve_data:
+                date_val = cve_data[date_field]
+                # Try to parse as datetime if string
+                if isinstance(date_val, str):
+                    try:
+                        return datetime.fromisoformat(date_val.replace('Z', '+00:00'))
+                    except:
+                        pass
+                return date_val
+
+            # Fall back to CVE ID parsing (CVE-YYYY-NNNNN)
+            cve_id = cve_data.get('cve', '')
+            match = re.match(r'CVE-(\d{4})-(\d+)', cve_id, re.IGNORECASE)
+            if match:
+                year = int(match.group(1))
+                number = int(match.group(2))
+                return (year, number)
+
+            # Last resort: use CVE string itself
+            return cve_id
+
+        try:
+            sorted_cves = sorted(cves, key=get_sort_key)
+            if verbose and len(cves) > 1:
+                print(f"  Sorted {len(cves)} CVEs chronologically")
+            return sorted_cves
+        except Exception as e:
+            if verbose:
+                print(f"  Warning: Could not sort CVEs chronologically: {e}")
+            return cves
 
     def _extract_file_paths(self, patch_location: str) -> List[str]:
         """
