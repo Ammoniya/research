@@ -128,15 +128,44 @@ Shows:
 
 ## Usage Recommendations
 
+### Quick Test (Auto Workers):
+```bash
+# Auto-detects optimal workers (CPU * 4)
+python mine_vulnerability_clones.py \
+  --scan-mode releases \
+  --max-plugins 100
+```
+**Expected time**: ~2-3 minutes with aggressive parallelization
+
+### With Verbose Logging (See What's Happening):
+```bash
+# See exactly what each worker is doing
+python mine_vulnerability_clones.py \
+  --scan-mode releases \
+  --max-plugins 100 \
+  --verbose
+```
+**Shows**: Worker PIDs, plugin processing, SVN operations in real-time
+
+### Custom Worker Count:
+```bash
+# Override auto-detection
+python mine_vulnerability_clones.py \
+  --scan-mode releases \
+  --max-plugins 100 \
+  --workers 16
+```
+**Use**: More workers for I/O-bound work (SVN operations)
+
 ### For Fast Exploration (Testing):
 ```bash
-# Scan 100 plugins, releases only, 4 workers
+# Scan 100 plugins, releases only, auto workers
 python mine_vulnerability_clones.py \
   --scan-mode releases \
   --max-plugins 100 \
   --max-revisions 20
 ```
-**Expected time**: ~5 minutes
+**Expected time**: ~2-3 minutes
 
 ### For Medium Research:
 ```bash
@@ -165,6 +194,65 @@ python mine_vulnerability_clones.py \
   --scan-mode commits
 ```
 **Expected time**: 4-8 hours (depends on plugin count and CPU)
+
+## Understanding Worker Behavior
+
+### Why CPU Usage Seems Low
+
+The mining process is **I/O-bound**, not CPU-bound:
+- Most time is spent waiting for SVN operations (disk/network I/O)
+- CPU is idle while waiting for: `svn list`, `svn cat`, `svn log`
+- Solution: Use MANY more workers than CPU cores
+
+### Auto-Detected Workers
+
+**Formula**: `workers = CPU_count * 4`
+
+**Example on 8-core system**:
+- CPUs: 8
+- Auto workers: 32 (8 × 4)
+- Why? While 28 workers wait for SVN, 4 are processing
+
+**See workers in action**:
+```bash
+# Watch what workers are doing
+python mine_vulnerability_clones.py \
+  --scan-mode releases \
+  --max-plugins 100 \
+  --verbose | grep "Worker-"
+```
+
+Output shows:
+```
+[Worker-12345] START: contact-form-7
+[Worker-12346] Getting revisions for woocommerce (mode: releases)
+[Worker-12347] Scanning 15 revisions for akismet
+[Worker-12348] DONE: jetpack - 3 total matches
+```
+
+### Manual Worker Tuning
+
+**Start conservative**:
+```bash
+--workers 16  # 2x CPU count
+```
+
+**Increase if**:
+- CPU usage is very low (<20%)
+- Workers finish quickly, sit idle
+- Plenty of RAM available
+
+**Optimal range for I/O-bound**:
+```bash
+--workers 32  # 4x CPU count (default)
+--workers 64  # 8x CPU count (very aggressive)
+--workers 128 # 16x CPU count (max for huge systems)
+```
+
+**Warning**: Too many workers can:
+- Exhaust file descriptors
+- Cause SVN timeouts
+- Use excessive RAM
 
 ## Configuration Tuning
 
