@@ -88,9 +88,41 @@ python validate_zero_days.py --plugin vulnerable-plugin
 - `fuzz_results/crashes/` - Crashing inputs
 - `fuzz_results/exploits/` - Generated PoC exploits
 
+## Patch Impact Analysis (NEW!)
+
+Analyze relationships between CVE patches using call graph, data flow, and control flow analysis:
+
+```bash
+# Compare two CVE patches
+python analyze_patch_impact.py \
+    --cve1 data/output/signatures/CVE-2023-1234.json \
+    --cve2 data/output/signatures/CVE-2023-5678.json \
+    --output results/impact_analysis.md
+
+# Batch analysis - compare all signatures
+python analyze_patch_impact.py \
+    --signatures-dir data/output/signatures \
+    --compare-all \
+    --output-dir data/output/impact_analysis
+
+# Run example to test the system
+python analyze_patch_impact.py --example
+```
+
+**Features:**
+- 📊 Call graph analysis - function dependencies and relationships
+- 🔄 Data flow tracking - variable usage and tainted data flows
+- 🌳 Control flow graphs - execution paths and branching
+- 🎯 Impact scoring - quantitative relationship metrics (0-100)
+- 🔍 Security analysis - sources, sinks, and sanitization detection
+- ⏱️ Temporal analysis - how earlier patches affect later ones
+
+**Output:** Detailed markdown reports showing how patches relate to each other
+
 ## Documentation
 
 For detailed documentation, see:
+- `docs/PATCH_IMPACT_ANALYSIS.md` - Patch impact analysis guide (NEW!)
 - `docs/PHASE2_MINING.md` - Phase 2 mining documentation
 - `docs/PHASE3_FUZZING.md` - Phase 3 fuzzing documentation
 - `docs/QUICKSTART.md` - Full project quickstart guide
