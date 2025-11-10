@@ -201,15 +201,29 @@ def main():
                     )
 
                     if ast_sigs:
-                        # Add AST signatures to the signature
-                        signature.ast_signatures = ast_sigs
-                        print(f"    [+] Generated {len(ast_sigs)} AST signature(s)")
+                        # Sort by confidence score (highest first)
+                        ast_sigs_sorted = sorted(ast_sigs, key=lambda x: x.get('confidence_score', 0), reverse=True)
 
-                        # Show security functions
-                        for i, ast_sig in enumerate(ast_sigs, 1):
+                        # Add AST signatures to the signature
+                        signature.ast_signatures = ast_sigs_sorted
+
+                        # Count high-confidence signatures
+                        high_conf = sum(1 for sig in ast_sigs_sorted if sig.get('is_high_confidence', False))
+
+                        print(f"    [+] Generated {len(ast_sigs_sorted)} AST signature(s) ({high_conf} high-confidence)")
+
+                        # Show top signatures
+                        for i, ast_sig in enumerate(ast_sigs_sorted, 1):
+                            confidence = ast_sig.get('confidence_score', 0)
+                            is_high = '★' if ast_sig.get('is_high_confidence', False) else ' '
+
+                            print(f"        [{i}]{is_high} Score: {confidence:3d} | {ast_sig.get('pattern_type', 'unknown')}")
+
                             if ast_sig.get('security_functions_added'):
-                                print(f"        [{i}] Security functions added: {', '.join(ast_sig['security_functions_added'])}")
-                            print(f"        [{i}] Pattern type: {ast_sig.get('pattern_type', 'unknown')}")
+                                print(f"            → Added: {', '.join(ast_sig['security_functions_added'])}")
+
+                            if ast_sig.get('security_functions_removed'):
+                                print(f"            → Removed: {', '.join(ast_sig['security_functions_removed'])} [anti-pattern]")
 
                 except Exception as e:
                     print(f"    [!] AST signature generation failed: {e}")
