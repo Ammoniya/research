@@ -1,0 +1,646 @@
+{
+  "cve": "CVE-2024-9425",
+  "vulnerability_type": "Cross-Site Scripting (XSS)",
+  "description": "Missing output escaping",
+  "vulnerable_pattern": {
+    "code": "<?php echo $classes; ?>",
+    "ast": {
+      "node_type": "program",
+      "text": "<?php echo $classes; ?>",
+      "start_byte": 0,
+      "end_byte": 23,
+      "start_point": [
+        0,
+        0
+      ],
+      "end_point": [
+        0,
+        23
+      ],
+      "field_name": null,
+      "children": [
+        {
+          "node_type": "php_tag",
+          "text": "<?php",
+          "start_byte": 0,
+          "end_byte": 5,
+          "start_point": [
+            0,
+            0
+          ],
+          "end_point": [
+            0,
+            5
+          ],
+          "field_name": null,
+          "children": []
+        },
+        {
+          "node_type": "echo_statement",
+          "text": "echo $classes;",
+          "start_byte": 6,
+          "end_byte": 20,
+          "start_point": [
+            0,
+            6
+          ],
+          "end_point": [
+            0,
+            20
+          ],
+          "field_name": null,
+          "children": [
+            {
+              "node_type": "echo",
+              "text": "echo",
+              "start_byte": 6,
+              "end_byte": 10,
+              "start_point": [
+                0,
+                6
+              ],
+              "end_point": [
+                0,
+                10
+              ],
+              "field_name": null,
+              "children": []
+            },
+            {
+              "node_type": "variable_name",
+              "text": "$classes",
+              "start_byte": 11,
+              "end_byte": 19,
+              "start_point": [
+                0,
+                11
+              ],
+              "end_point": [
+                0,
+                19
+              ],
+              "field_name": null,
+              "children": [
+                {
+                  "node_type": "$",
+                  "text": "$",
+                  "start_byte": 11,
+                  "end_byte": 12,
+                  "start_point": [
+                    0,
+                    11
+                  ],
+                  "end_point": [
+                    0,
+                    12
+                  ],
+                  "field_name": null,
+                  "children": []
+                },
+                {
+                  "node_type": "name",
+                  "text": "classes",
+                  "start_byte": 12,
+                  "end_byte": 19,
+                  "start_point": [
+                    0,
+                    12
+                  ],
+                  "end_point": [
+                    0,
+                    19
+                  ],
+                  "field_name": null,
+                  "children": []
+                }
+              ]
+            },
+            {
+              "node_type": ";",
+              "text": ";",
+              "start_byte": 19,
+              "end_byte": 20,
+              "start_point": [
+                0,
+                19
+              ],
+              "end_point": [
+                0,
+                20
+              ],
+              "field_name": null,
+              "children": []
+            }
+          ]
+        },
+        {
+          "node_type": "text_interpolation",
+          "text": "?>",
+          "start_byte": 21,
+          "end_byte": 23,
+          "start_point": [
+            0,
+            21
+          ],
+          "end_point": [
+            0,
+            23
+          ],
+          "field_name": null,
+          "children": [
+            {
+              "node_type": "php_end_tag",
+              "text": "?>",
+              "start_byte": 21,
+              "end_byte": 23,
+              "start_point": [
+                0,
+                21
+              ],
+              "end_point": [
+                0,
+                23
+              ],
+              "field_name": null,
+              "children": []
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "patched_pattern": {
+    "code": "<?php echo esc_attr($classes); ?>",
+    "ast": {
+      "node_type": "program",
+      "text": "<?php echo esc_attr($classes); ?>",
+      "start_byte": 0,
+      "end_byte": 33,
+      "start_point": [
+        0,
+        0
+      ],
+      "end_point": [
+        0,
+        33
+      ],
+      "field_name": null,
+      "children": [
+        {
+          "node_type": "php_tag",
+          "text": "<?php",
+          "start_byte": 0,
+          "end_byte": 5,
+          "start_point": [
+            0,
+            0
+          ],
+          "end_point": [
+            0,
+            5
+          ],
+          "field_name": null,
+          "children": []
+        },
+        {
+          "node_type": "echo_statement",
+          "text": "echo esc_attr($classes);",
+          "start_byte": 6,
+          "end_byte": 30,
+          "start_point": [
+            0,
+            6
+          ],
+          "end_point": [
+            0,
+            30
+          ],
+          "field_name": null,
+          "children": [
+            {
+              "node_type": "echo",
+              "text": "echo",
+              "start_byte": 6,
+              "end_byte": 10,
+              "start_point": [
+                0,
+                6
+              ],
+              "end_point": [
+                0,
+                10
+              ],
+              "field_name": null,
+              "children": []
+            },
+            {
+              "node_type": "function_call_expression",
+              "text": "esc_attr($classes)",
+              "start_byte": 11,
+              "end_byte": 29,
+              "start_point": [
+                0,
+                11
+              ],
+              "end_point": [
+                0,
+                29
+              ],
+              "field_name": null,
+              "children": [
+                {
+                  "node_type": "name",
+                  "text": "esc_attr",
+                  "start_byte": 11,
+                  "end_byte": 19,
+                  "start_point": [
+                    0,
+                    11
+                  ],
+                  "end_point": [
+                    0,
+                    19
+                  ],
+                  "field_name": "function",
+                  "children": []
+                },
+                {
+                  "node_type": "arguments",
+                  "text": "($classes)",
+                  "start_byte": 19,
+                  "end_byte": 29,
+                  "start_point": [
+                    0,
+                    19
+                  ],
+                  "end_point": [
+                    0,
+                    29
+                  ],
+                  "field_name": "arguments",
+                  "children": [
+                    {
+                      "node_type": "(",
+                      "text": "(",
+                      "start_byte": 19,
+                      "end_byte": 20,
+                      "start_point": [
+                        0,
+                        19
+                      ],
+                      "end_point": [
+                        0,
+                        20
+                      ],
+                      "field_name": null,
+                      "children": []
+                    },
+                    {
+                      "node_type": "argument",
+                      "text": "$classes",
+                      "start_byte": 20,
+                      "end_byte": 28,
+                      "start_point": [
+                        0,
+                        20
+                      ],
+                      "end_point": [
+                        0,
+                        28
+                      ],
+                      "field_name": null,
+                      "children": [
+                        {
+                          "node_type": "variable_name",
+                          "text": "$classes",
+                          "start_byte": 20,
+                          "end_byte": 28,
+                          "start_point": [
+                            0,
+                            20
+                          ],
+                          "end_point": [
+                            0,
+                            28
+                          ],
+                          "field_name": null,
+                          "children": [
+                            {
+                              "node_type": "$",
+                              "text": "$",
+                              "start_byte": 20,
+                              "end_byte": 21,
+                              "start_point": [
+                                0,
+                                20
+                              ],
+                              "end_point": [
+                                0,
+                                21
+                              ],
+                              "field_name": null,
+                              "children": []
+                            },
+                            {
+                              "node_type": "name",
+                              "text": "classes",
+                              "start_byte": 21,
+                              "end_byte": 28,
+                              "start_point": [
+                                0,
+                                21
+                              ],
+                              "end_point": [
+                                0,
+                                28
+                              ],
+                              "field_name": null,
+                              "children": []
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "node_type": ")",
+                      "text": ")",
+                      "start_byte": 28,
+                      "end_byte": 29,
+                      "start_point": [
+                        0,
+                        28
+                      ],
+                      "end_point": [
+                        0,
+                        29
+                      ],
+                      "field_name": null,
+                      "children": []
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "node_type": ";",
+              "text": ";",
+              "start_byte": 29,
+              "end_byte": 30,
+              "start_point": [
+                0,
+                29
+              ],
+              "end_point": [
+                0,
+                30
+              ],
+              "field_name": null,
+              "children": []
+            }
+          ]
+        },
+        {
+          "node_type": "text_interpolation",
+          "text": "?>",
+          "start_byte": 31,
+          "end_byte": 33,
+          "start_point": [
+            0,
+            31
+          ],
+          "end_point": [
+            0,
+            33
+          ],
+          "field_name": null,
+          "children": [
+            {
+              "node_type": "php_end_tag",
+              "text": "?>",
+              "start_byte": 31,
+              "end_byte": 33,
+              "start_point": [
+                0,
+                31
+              ],
+              "end_point": [
+                0,
+                33
+              ],
+              "field_name": null,
+              "children": []
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "diffs": [
+    {
+      "diff_type": "modified",
+      "vulnerable_node": {
+        "node_type": "variable_name",
+        "text": "$classes",
+        "start_byte": 11,
+        "end_byte": 19,
+        "start_point": [
+          0,
+          11
+        ],
+        "end_point": [
+          0,
+          19
+        ],
+        "field_name": null,
+        "children": [
+          {
+            "node_type": "$",
+            "text": "$",
+            "start_byte": 11,
+            "end_byte": 12,
+            "start_point": [
+              0,
+              11
+            ],
+            "end_point": [
+              0,
+              12
+            ],
+            "field_name": null,
+            "children": []
+          },
+          {
+            "node_type": "name",
+            "text": "classes",
+            "start_byte": 12,
+            "end_byte": 19,
+            "start_point": [
+              0,
+              12
+            ],
+            "end_point": [
+              0,
+              19
+            ],
+            "field_name": null,
+            "children": []
+          }
+        ]
+      },
+      "patched_node": {
+        "node_type": "function_call_expression",
+        "text": "esc_attr($classes)",
+        "start_byte": 11,
+        "end_byte": 29,
+        "start_point": [
+          0,
+          11
+        ],
+        "end_point": [
+          0,
+          29
+        ],
+        "field_name": null,
+        "children": [
+          {
+            "node_type": "name",
+            "text": "esc_attr",
+            "start_byte": 11,
+            "end_byte": 19,
+            "start_point": [
+              0,
+              11
+            ],
+            "end_point": [
+              0,
+              19
+            ],
+            "field_name": "function",
+            "children": []
+          },
+          {
+            "node_type": "arguments",
+            "text": "($classes)",
+            "start_byte": 19,
+            "end_byte": 29,
+            "start_point": [
+              0,
+              19
+            ],
+            "end_point": [
+              0,
+              29
+            ],
+            "field_name": "arguments",
+            "children": [
+              {
+                "node_type": "(",
+                "text": "(",
+                "start_byte": 19,
+                "end_byte": 20,
+                "start_point": [
+                  0,
+                  19
+                ],
+                "end_point": [
+                  0,
+                  20
+                ],
+                "field_name": null,
+                "children": []
+              },
+              {
+                "node_type": "argument",
+                "text": "$classes",
+                "start_byte": 20,
+                "end_byte": 28,
+                "start_point": [
+                  0,
+                  20
+                ],
+                "end_point": [
+                  0,
+                  28
+                ],
+                "field_name": null,
+                "children": [
+                  {
+                    "node_type": "variable_name",
+                    "text": "$classes",
+                    "start_byte": 20,
+                    "end_byte": 28,
+                    "start_point": [
+                      0,
+                      20
+                    ],
+                    "end_point": [
+                      0,
+                      28
+                    ],
+                    "field_name": null,
+                    "children": [
+                      {
+                        "node_type": "$",
+                        "text": "$",
+                        "start_byte": 20,
+                        "end_byte": 21,
+                        "start_point": [
+                          0,
+                          20
+                        ],
+                        "end_point": [
+                          0,
+                          21
+                        ],
+                        "field_name": null,
+                        "children": []
+                      },
+                      {
+                        "node_type": "name",
+                        "text": "classes",
+                        "start_byte": 21,
+                        "end_byte": 28,
+                        "start_point": [
+                          0,
+                          21
+                        ],
+                        "end_point": [
+                          0,
+                          28
+                        ],
+                        "field_name": null,
+                        "children": []
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "node_type": ")",
+                "text": ")",
+                "start_byte": 28,
+                "end_byte": 29,
+                "start_point": [
+                  0,
+                  28
+                ],
+                "end_point": [
+                  0,
+                  29
+                ],
+                "field_name": null,
+                "children": []
+              }
+            ]
+          }
+        ]
+      },
+      "path": [
+        "program",
+        "echo_statement",
+        "variable_name"
+      ],
+      "description": "Node type changed: variable_name -> function_call_expression"
+    }
+  ]
+}
