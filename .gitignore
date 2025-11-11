@@ -19,6 +19,8 @@ ENV/
 *.swp
 *.swo
 
+data/
+
 # Generated files
 vulnerability_signatures.json
 *.log
