@@ -25,6 +25,10 @@ data/
 vulnerability_signatures.json
 *.log
 
+# Malicious JS detection results
+diff_results/
+malicious_js_report.txt
+
 # Data directory - all input/output data
 data/input/*.json
 data/input/*.txt
