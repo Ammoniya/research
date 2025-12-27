@@ -17,8 +17,13 @@ import sys
 from pathlib import Path
 
 
-def create_directory_structure(base_dir: Path):
-    """Create the diff_results directory structure."""
+def create_directory_structure(base_dir: Path) -> bool:
+    """
+    Create the diff_results directory structure.
+    
+    Returns:
+        True if directory was created, False if it already exists
+    """
     if base_dir.exists():
         print(f"[!] Directory already exists: {base_dir}")
         return False

@@ -15,13 +15,12 @@ Usage:
     python detect_malicious_js.py [--dir DIRECTORY] [--output OUTPUT_FILE]
 """
 
-import os
 import re
 import json
+import math
 import argparse
-import base64
 from pathlib import Path
-from typing import Dict, List, Tuple
+from typing import Dict, List
 from collections import defaultdict
 from datetime import datetime
 
@@ -360,7 +359,6 @@ class MaliciousJSDetector:
             freq[char] += 1
         
         # Calculate entropy
-        import math
         entropy = 0
         content_len = len(content)
         for count in freq.values():
